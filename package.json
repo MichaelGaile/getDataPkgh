@@ -15,6 +15,7 @@
     "eslint-plugin-import": "^2.20.1",
     "eslint-plugin-node": "^11.0.0",
     "got": "^10.5.7",
-    "htmlparser2": "^4.0.0"
+    "htmlparser2": "^4.0.0",
+    "nanomatch": "^1.2.13"
   }
 }
