@@ -1,7 +1,7 @@
 const got = require('got');
 const translit = require('cyrillic-to-translit-js');
 const cheerio = require('cheerio');
-const nm = require('nanomatch');
+const match = require('matcher');
 
 function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
@@ -23,31 +23,33 @@ class DataPkgh {
           'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html': { html: '' },
           'https://pkgh.edu.ru/zaochnoe-otdelenie.html': { html: '' },
         },
+        u: {},
       },
       teacher: {
         timestamp: 0,
         url: {
           'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]': { html: '' },
         },
+        u: {},
       },
     };
 
+    console.log(this.constructor.parseUrl(Object.keys(this._data.teacher.url)[0]));
     // Parsing url's
-    const updateUrl = () => {
-      const data = this._data;
+    const updateUrl = (data) => {
+      const d = data;
       Object.keys(data).forEach((page) => {
-        // New url
-        data[page].u = this.constructor.parseUrl(Object.keys(data[page].url)).map((u) => {
-          const obj = {};
-          obj[u] = { html: null };
-          return obj;
+        this.constructor.parseUrl(Object.keys(d[page].url)).forEach((url) => {
+          d[page].u[url] = {
+            html: '',
+          };
         });
       });
-      this._data = data;
+      return d;
     };
-
-    updateUrl();
+    this._data = updateUrl(this._data);
     console.log(this._data);
+    console.log(this.constructor.parseUrl('https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]'));
 
     this._completed = {
       schedule: {
@@ -87,17 +89,21 @@ class DataPkgh {
   }
 
   static parseUrl(url) {
-    function parse(url) {
-      if (nm.isMatch(url, '*[[range(*)]]*')) {
+    function parse(str) {
+      if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
+      const func = str.split('[[')[1].split(']]')[0];
+      const title = func.split('(')[0];
+      const params = func.split('(')[1].split(')')[0].split(',');
+      if (title === 'range') {
         const plenty = [];
-        const f = nm.capture('*]]*', nm.capture('*[[*', url)[1])[0];
-        const params = f.replace('range(', '').slice(0, -1).split(',').map((el) => { return Number(el); });
+        if (params.length <= 1) throw new Error('Not valid params in range function');
+        if (params[2] === undefined) params[2] = 1;
         for (let i = params[0]; i <= params[1]; i += params[2]) {
-          plenty.push(url.replace(`[[${f}]]`, i));
+          plenty.push(str.replace(`[[${func}]]`, i));
         }
         return plenty;
       }
-      return [url];
+      return [str];
     }
 
     if (url instanceof Array) {
@@ -291,7 +297,7 @@ class DataPkgh {
     return this.checkCache(page).then((cache) => {
       if (!cache) {
         const teacher = [];
-        Object.keys(this.data[page].u).forEach((url) => {
+        Object.keys(this.data[page].u).forEach((u) => {
           if (this.data[page].u[u].html === '') {
             throw new Error('html is not valid');
           }
@@ -345,4 +351,3 @@ class DataPkgh {
 }
 
 const g = new DataPkgh();
-g.getTeacher((r) => console.log(r));
