@@ -13,34 +13,32 @@ class DataPkgh {
     this.cache = cache;
     this.timeCache = timeCache;
 
-    // Work with u not url
-    // u is parsed url
-    // url not parsed
+    // Not url is url which not been parsed
+    // Work with url
     this._data = {
       schedule: {
         timestamp: 0,
-        url: {
-          'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html': { html: '' },
-          'https://pkgh.edu.ru/zaochnoe-otdelenie.html': { html: '' },
-        },
-        u: {},
+        notUrl: [
+          'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
+          'https://pkgh.edu.ru/zaochnoe-otdelenie.html',
+        ],
+        url: {},
       },
       teacher: {
         timestamp: 0,
-        url: {
-          'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]': { html: '' },
-        },
-        u: {},
+        notUrl: [
+          'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]',
+        ],
+        url: {},
       },
     };
 
-    console.log(this.constructor.parseUrl(Object.keys(this._data.teacher.url)[0]));
     // Parsing url's
     const updateUrl = (data) => {
       const d = data;
       Object.keys(data).forEach((page) => {
-        this.constructor.parseUrl(Object.keys(d[page].url)).forEach((url) => {
-          d[page].u[url] = {
+        this.constructor.parseUrl(d[page].notUrl).forEach((url) => {
+          d[page].url[url] = {
             html: '',
           };
         });
@@ -48,8 +46,6 @@ class DataPkgh {
       return d;
     };
     this._data = updateUrl(this._data);
-    console.log(this._data);
-    console.log(this.constructor.parseUrl('https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]'));
 
     this._completed = {
       schedule: {
@@ -93,8 +89,10 @@ class DataPkgh {
       if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
       const func = str.split('[[')[1].split(']]')[0];
       const title = func.split('(')[0];
-      const params = func.split('(')[1].split(')')[0].split(',');
+      // Warning!!! Params default is string! be careful
+      let params = func.split('(')[1].split(')')[0].split(',');
       if (title === 'range') {
+        params = params.map((p) => { return Number(p); });
         const plenty = [];
         if (params.length <= 1) throw new Error('Not valid params in range function');
         if (params[2] === undefined) params[2] = 1;
@@ -103,11 +101,11 @@ class DataPkgh {
         }
         return plenty;
       }
-      return [str];
+      return str;
     }
 
     if (url instanceof Array) {
-      return url.map((u) => { return parse(u); });
+      return [].concat(...url.map((u) => { return parse(u); }));
     }
 
     return parse(url);
@@ -118,11 +116,11 @@ class DataPkgh {
       throw new Error('page is not exists');
     }
     if (!this.cache || (Date.now() - this.data[page].timestamp) > this.timeCache) {
-      for (const u in this.data[page].u) {
-        const body = await got(u, { resolveBodyOnly: true });
+      for (const url in this.data[page].url) {
+        const body = await got(url, { resolveBodyOnly: true });
         this.data = {
           page: page,
-          url: u,
+          url: url,
           payload: body,
         };
       }
@@ -166,11 +164,11 @@ class DataPkgh {
         // Not cache
         const schedule = {};
 
-        Object.keys(this.data[page].u).forEach((url) => {
-          if (this.data[page].u[url].html === '') {
+        Object.keys(this.data[page].url).forEach((url) => {
+          if (this.data[page].url[url].html === '') {
             throw new Error('html is not valid');
           }
-          const $ = cheerio.load(this.data[page].u[url].html);
+          const $ = cheerio.load(this.data[page].url[url].html);
           let textTag = 'h4';
 
           // Search tag
@@ -297,11 +295,11 @@ class DataPkgh {
     return this.checkCache(page).then((cache) => {
       if (!cache) {
         const teacher = [];
-        Object.keys(this.data[page].u).forEach((u) => {
-          if (this.data[page].u[u].html === '') {
+        Object.keys(this.data[page].url).forEach((url) => {
+          if (this.data[page].url[u].html === '') {
             throw new Error('html is not valid');
           }
-          const $ = cheerio.load(this.data[page].u[u].html);
+          const $ = cheerio.load(this.data[page].url[u].html);
           const allBlock = $('.itemView');
           allBlock.each((i, block) => {
             const author = $($(block).find('[rel="author"]').get(0)).text();
@@ -341,7 +339,6 @@ class DataPkgh {
           });
         });
         this.completed = { page: page, payload: teacher };
-        console.log('not cache');
         return teacher;
       }
 
