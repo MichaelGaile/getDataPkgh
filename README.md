@@ -16,8 +16,7 @@
 ```
 npm install getDataPkgh
 ```
-```
-  nodejs
+``` nodejs
     const dPkgh = require('getDataPkgh');
     const pkgh = new dPkgh();
     pkgh.getSchedule().then((r) => console.log(r));
@@ -26,8 +25,7 @@ npm install getDataPkgh
 ## Инициализация
 cache bool(true) - Кеш загрузки и обработки
 timeCache(150000)ms - Время жизни кеша
-```
-  nodejs
+``` nodejs
     const dPkgh = require('getDataPkgh');
     const cache = true;
     const timeCache = 30000;
@@ -37,14 +35,12 @@ timeCache(150000)ms - Время жизни кеша
 
 ## Расписание
 ### Получить весь список
-```
-  nodejs
+``` nodejs
     pkgh.getSchedule().then((r) => console.log(r));
 ```
 ### Получить конкретную группу
 * При получении конкретной группы будет загружена и обработана вся страница колледжа *
-```
-  nodejs
+``` nodejs
     const id = 'YuS1731kz'
     pkgh.getScheduleGroup(id).then((r) => console.log(r));
 ```
