@@ -13,23 +13,32 @@ class DataPkgh {
     this.cache = cache;
     this.timeCache = timeCache;
 
-    // Not url is url which not been parsed
-    // Work with url
+    // Payload of Map string url => string html
     this._data = {
       schedule: {
         timestamp: 0,
-        notUrl: [
+        url: [
           'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
           'https://pkgh.edu.ru/zaochnoe-otdelenie.html',
         ],
-        url: {},
+        payload: new Map(),
       },
       teacher: {
         timestamp: 0,
-        notUrl: [
+        url: [
           'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]',
         ],
-        url: {},
+        payload: new Map(),
+      },
+    };
+    this._completed = {
+      schedule: {
+        timestamp: 0,
+        data: null,
+      },
+      teacher: {
+        timestamp: 0,
+        data: null,
       },
     };
 
@@ -37,30 +46,14 @@ class DataPkgh {
     const updateUrl = (data) => {
       const d = data;
       Object.keys(data).forEach((page) => {
-        this.constructor.parseUrl(d[page].notUrl).forEach((url) => {
-          d[page].url[url] = {
-            html: '',
-          };
+        this.constructor.parseUrl(d[page].url).forEach((url) => {
+          d[page].payload.set(url, '');
         });
       });
       return d;
     };
     this._data = updateUrl(this._data);
 
-    this._completed = {
-      schedule: {
-        timestamp: 0,
-        data: {
-          url: { '': { html: '' } },
-        },
-      },
-      teacher: {
-        timestamp: 0,
-        data: {
-          url: { '': { html: '' } },
-        },
-      },
-    };
   }
 
   set completed(data) {
@@ -77,7 +70,7 @@ class DataPkgh {
   // input { page url payload }
   set data(data) {
     this._data[data.page].timestamp = Date.now();
-    this._data[data.page].url[data.url].html = data.payload;
+    this._data[data.page].payload.set(data.url, data.payload);
   }
 
   get data() {
@@ -89,6 +82,7 @@ class DataPkgh {
       if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
       const func = str.split('[[')[1].split(']]')[0];
       const title = func.split('(')[0];
+
       // Warning!!! Params default is string! be careful
       let params = func.split('(')[1].split(')')[0].split(',');
       if (title === 'range') {
@@ -116,7 +110,7 @@ class DataPkgh {
       throw new Error('page is not exists');
     }
     if (!this.cache || (Date.now() - this.data[page].timestamp) > this.timeCache) {
-      for (const url in this.data[page].url) {
+      for (const [url, html] of this.data[page].payload) {
         const body = await got(url, { resolveBodyOnly: true });
         this.data = {
           page: page,
@@ -164,11 +158,8 @@ class DataPkgh {
         // Not cache
         const schedule = {};
 
-        Object.keys(this.data[page].url).forEach((url) => {
-          if (this.data[page].url[url].html === '') {
-            throw new Error('html is not valid');
-          }
-          const $ = cheerio.load(this.data[page].url[url].html);
+        this.data[page].payload.forEach((html) => {
+          const $ = cheerio.load(html);
           let textTag = 'h4';
 
           // Search tag
@@ -275,7 +266,7 @@ class DataPkgh {
     });
   }
 
-  async getListGroup() {
+  async getScheduleListGroup() {
     const page = 'schedule';
     return this.getSchedule().then((data) => Object.keys(data).map((id) => {
       const obj = {};
@@ -285,7 +276,7 @@ class DataPkgh {
     }));
   }
 
-  async getGroup(id) {
+  async getScheduleGroup(id) {
     await this.getSchedule();
     return this.completed.schedule.data[id];
   }
@@ -295,11 +286,8 @@ class DataPkgh {
     return this.checkCache(page).then((cache) => {
       if (!cache) {
         const teacher = [];
-        Object.keys(this.data[page].url).forEach((url) => {
-          if (this.data[page].url[u].html === '') {
-            throw new Error('html is not valid');
-          }
-          const $ = cheerio.load(this.data[page].url[u].html);
+        this.data[page].payload.forEach((html, url) => {
+          const $ = cheerio.load(html);
           const allBlock = $('.itemView');
           allBlock.each((i, block) => {
             const author = $($(block).find('[rel="author"]').get(0)).text();
@@ -347,4 +335,4 @@ class DataPkgh {
   }
 }
 
-const g = new DataPkgh();
+module.exports = DataPkgh;
