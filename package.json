@@ -6,13 +6,13 @@
   "repository": "https://github.com/MichaelGaile/get-data-pkgh.git",
   "author": "MichaelGaile",
   "license": "GNU-3.0",
-  "devDependencices": {
+  "devDependencies": {
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.20.1",
-    "eslint-plugin-node": "^11.0.0",
-  }
+    "eslint-plugin-node": "^11.0.0"
+  },
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
     "cyrillic-to-translit-js": "^3.0.1",
