@@ -1,5 +1,5 @@
 {
-  "name": "getDataPkgh",
+  "name": "get-data-pkgh",
   "version": "1.0.0",
   "description": "Getting data from the College's website",
   "main": "getDataPkgh.js",
