@@ -190,7 +190,7 @@ class DataPkgh {
 
                 $(row).each((numRow, el) => {
                   const name = $($(el).find('.group').get(0)).text();
-                  const id = generateId(name);
+                  const hash = generateId(name);
 
                   const num = $($(el).find('.pnum').get(0)).text();
                   const numSubject = $($(el).find('.pnum').get(0)).text();
@@ -198,17 +198,17 @@ class DataPkgh {
                   const denSubject = $($(el).find('.pnum').get(1)).text();
                   const denTeacher = $($(el).find('.pteacher').get(1)).text();
 
-                  if (!(id in schedule)) {
-                    schedule[id] = {};
+                  if (!(hash in schedule)) {
+                    schedule[hash] = {};
                   }
                   if (!('replace' in schedule)) {
-                    schedule[id].replace = {
+                    schedule[hash].replace = {
                       timestamp: '',
                       lesson: [],
                     };
                   }
-                  schedule[id].replace.timestamp = timestamp;
-                  schedule[id].replace.lesson.push({
+                  schedule[hash].replace.timestamp = timestamp;
+                  schedule[hash].replace.lesson.push({
                     num,
                     numSubject,
                     numTeacher,
@@ -219,15 +219,15 @@ class DataPkgh {
               } else {
                 // Some schedule
                 const name = $(el).text();
-                const id = generateId($(el).text());
+                const hash = generateId($(el).text());
 
-                schedule[id] = {
+                schedule[hash] = {
                   table: [],
                   name,
                   specialty,
                 };
 
-                schedule[id].name = name;
+                schedule[hash].name = name;
 
                 const parent = $(el).parent();
                 const table = $(parent).find('table');
@@ -236,7 +236,7 @@ class DataPkgh {
                   const dayWeek = $($(el).find('.groupname').get(0)).text();
                   const cellTable = $(el).find('tr');
 
-                  schedule[id].table[numTable] = {
+                  schedule[hash].table[numTable] = {
                     dayWeek,
                     lesson: [],
                   };
@@ -247,7 +247,7 @@ class DataPkgh {
                     const denSubject = $($(el).find('.paltname').get(0)).text();
                     const denTeacher = $($(el).find('.paltteacher').get(0)).text();
 
-                    schedule[id].table[numTable].lesson[cellNum] = {
+                    schedule[hash].table[numTable].lesson[cellNum] = {
                       numSubject,
                       numTeacher,
                       denSubject,
@@ -268,19 +268,36 @@ class DataPkgh {
 
   async getScheduleListGroup() {
     const page = 'schedule';
-    return this.getSchedule().then((data) => Object.keys(data).map((id) => {
+    return this.getSchedule().then((data) => Object.keys(data).map((hash) => {
       const obj = {};
-      obj.id = id;
-      obj.name = this.completed[page].data[id].name;
+      obj.id = hash;
+      obj.name = this.completed[page].data[hash].name;
       return obj;
     }));
   }
 
-  async getScheduleGroup(id) {
+  async getScheduleGroup(hash) {
     await this.getSchedule();
-    return this.completed.schedule.data[id];
+    return this.completed.schedule.data[hash];
   }
 
+  // Struct data Teacher
+  // [
+  //   {
+  //    id: hash(text+author+linkAuthor),
+  //    text: text,
+  //    author: {
+  //      text: author,
+  //      link: linkAuthor,
+  //    },
+  //    time: time,
+  //    tag: {
+  //      text: tag,
+  //      link: linkTag,
+  //    },
+  //    downoload: linkDownolad
+  //   }
+  // ]
   async getTeacher() {
     const page = 'teacher';
     return this.checkCache(page).then((cache) => {
@@ -304,7 +321,7 @@ class DataPkgh {
                 const href = $(link).attr('href');
                 const text = $(link).text();
                 out.push({
-                  href: href,
+                  link: href,
                   text: text,
                 });
               });
@@ -312,6 +329,7 @@ class DataPkgh {
             };
 
             teacher.push({
+              id: generateId(`${text}$${author}$${linkAuthor}$`),
               text: text,
               author: {
                 text: author,
@@ -333,6 +351,12 @@ class DataPkgh {
       return this.completed[page].data;
     });
   }
+
+  async getTeacherPost(hash) {
+    await this.getTeacher();
+    return this.completed.teacher.data[hash];
+  }
 }
 
 module.exports = DataPkgh;
+module.exports.generateId = generateId;

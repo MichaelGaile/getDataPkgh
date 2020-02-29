@@ -4,6 +4,7 @@
 ## Контент
 + [Быстрый старт](#Быстрый-старт)
 + [Инициализация](#Инициализация)
++ [Генерация индификатора](#Генерация-индификатора)
 + [Расписание](#Расписание)
   + [Получить весь список](#Получить-весь-список)
   + [Структура данных расписания](#Cтруктура-даных-расписания)
@@ -15,10 +16,10 @@
 ---
 ### Быстрый старт
 ```
-npm install getDataPkgh
+npm install get-data-pkgh
 ```
 ``` node
-    const dPkgh = require('getDataPkgh');
+    const dPkgh = require('get-data-pkgh');
     const pkgh = new dPkgh();
     pkgh.getSchedule().then((r) => console.log(r));
 ```
@@ -27,37 +28,97 @@ npm install getDataPkgh
 cache bool(true) - Кеш загрузки и обработки
 timeCache(150000)ms - Время жизни кеша
 ``` node
-    const dPkgh = require('getDataPkgh');
+    const dPkgh = require('get-data-pkgh');
     const cache = true;
     const timeCache = 30000;
     const pkgh = new dPkgh(cache, timeCache);
 ```
 ---
-
-## Структура данных 
-
-### Структура данных расписания
-
-### Структура данных раздела преподаватели 
+## Генерация индификатора
+Позволяет получить индификатор на основе строки убирая спец символы и спам символы
+``` node
+  const generateId = require('get-data-pkgh').generateId;
+  console.log(generateId('МР-18-6'));
+  // => 'MR186'
+```
 ---
 ## Расписание
 ### Получить весь список
 ``` node
     pkgh.getSchedule().then((r) => console.log(r));
 ```
+### Структура данных расписания
+``` node
+{
+  ID: Индификатор группы {
+    table: таблицы одной группы [
+      dayWeek: День недели,
+      lesson: [
+        {
+          numSubject: Предмет по числителю,
+          numTeacher: Преподователь по числителю,
+          denSubject: Предмет по знаменятилю,
+          denTeacher: Преподователь по знаменатилю,
+        }
+        ...
+      ]
+      ...
+    ]
+    name: Имя группы,
+    specialty: Специальность группы,
+  }
+  EE1934kz: {
+    table: [ [Object]  ],
+    name: 'ЭЭ-19-34кз',
+    specialty: 'Информация Заочного отделения'
+  },
+  YuS1731kz: {
+    table: [ [Object]  ],
+    name: 'ЮС-17-31кз',
+    specialty: 'Информация Заочного отделения'
+  },
+  ...
+}
+```
 ### Получить конкретную группу
 ** При получении конкретной группы будет загружена и обработана вся страница колледжа **
 ``` node
-    const id = 'YuS1731kz'
+    const generateId = dPkgh.generateId;
+    const id = generateId('КП-18-25');
     pkgh.getScheduleGroup(id).then((r) => console.log(r));
 ```
 
 ---
 ## Раздел преподаватели 
 
-### Получение вывода данных
 ### Получение всех постов
 ** Будет загружено ~10 страниц с сайта колледжа **
 ``` node
   pkgh.getTeacher().then((r) => console.log(r));
+```
+### Структура данных раздела преподаватели 
+``` node 
+[
+  {
+    id: Индификатор,
+    text: Текст к посту,
+    author: {
+      text: ФИО автора,
+      link: Ссылка на автора,
+    },
+    time: Время публикации,
+    tag: {
+      text: Текст тега,
+      link: Ссылка на все посты с данным тегом,
+    },
+    downoload: [
+      {
+        link: Ссылка на скачивание,
+        text: Текст ссылки,
+      },
+      ...
+    ]
+  }
+  ...
+]
 ```
