@@ -1,6 +1,5 @@
 const got = require('got');
 const cheerio = require('cheerio');
-const match = require('matcher');
 const path = require('path');
 const generateId = require(path.join(__dirname, 'generateId.js'));
 
@@ -121,20 +120,20 @@ class DataPkgh {
   }
 
   /* Struct data schedule
-   * [ {
-   * name: { type: String },
-   * specialty: { type: String },
+   * {
+   * name: name Group
+   * specialty: specialty group
    * table: [ {
-   *   dayWeek: { type: String },
+   *   dayWeek: day week
    *   lesson: [ {
-   *     numSubject: { type: String },
+   *     numSubject: numeration subject
    *     numTeacher: { type: String },
-   *     denSubject: { type: String },
+   *     denSubject: denominator subject
    *     denTeacher: { type: String },
    *    } ]
    * } ],
    * replace: {
-   *   timeStamp: '',
+   *   timeStamp: date replace,
    *   lesson: [ {
    *     numSubject: { type: String },
    *     numTeacher: { type: String },
@@ -143,7 +142,7 @@ class DataPkgh {
    *   } ]
    * }
    *
-   * } ]
+   * }
    *
    */
 
@@ -326,7 +325,7 @@ class DataPkgh {
             };
 
             teacher.push({
-              id: generateId(`${text}-${author}-${linkAuthor}-`),
+              id: generateId(`${time}-${author}-${linkAuthor}-`),
               text: text,
               author: {
                 text: author,
