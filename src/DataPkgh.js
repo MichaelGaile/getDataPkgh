@@ -298,7 +298,7 @@ class DataPkgh {
     const page = 'teacher';
     return this.checkCache(page).then((cache) => {
       if (!cache) {
-        const teacher = [];
+        const teacher = {};
         this.data[page].payload.forEach((html, url) => {
           const $ = cheerio.load(html);
           const allBlock = $('.itemView');
@@ -323,9 +323,8 @@ class DataPkgh {
               });
               return out;
             };
-
-            teacher.push({
-              id: generateId(`${time}-${author}-${linkAuthor}-`),
+            const id = generateId(`${time}-${author}-${linkAuthor}-`);
+            teacher[id] = {
               text: text,
               author: {
                 text: author,
@@ -337,7 +336,7 @@ class DataPkgh {
                 link: linkTag ? linkTag : '',
               },
               downoload: downoload(),
-            });
+            }
           });
         });
         this.completed = { page: page, payload: teacher };
