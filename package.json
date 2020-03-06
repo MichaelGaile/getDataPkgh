@@ -16,9 +16,11 @@
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
     "cyrillic-to-translit-js": "^3.0.1",
-    "got": "^10.5.7",
+    "html-table-to-json": "^1.0.0",
     "htmlparser2": "^4.0.0",
     "matcher": "^2.1.0",
-    "nanomatch": "^1.2.13"
+    "nanomatch": "^1.2.13",
+    "node-fetch": "^2.6.0",
+    "tabletojson": "^2.0.0"
   }
 }

@@ -1,6 +1,7 @@
 const translit = require('cyrillic-to-translit-js');
-const got = require('got');
 const cheerio = require('cheerio');
+const tableToJson = require('html-table-to-json');
+const fetch = require('node-fetch');
 
 function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
@@ -110,7 +111,7 @@ class DataPkgh {
     }
     if (!this.cache || (Date.now() - this.data[page].timestamp) > this.timeCache) {
       for (const [url, html] of this.data[page].payload) {
-        const body = await got(url, { resolveBodyOnly: true });
+        const body = await fetch(url).then((r) => r.text()).then((body) => { return body; });
         this.data = {
           page: page,
           url: url,
@@ -152,117 +153,117 @@ class DataPkgh {
   async getSchedule() {
     const page = 'schedule';
 
-    return this.checkCache(page).then((cache) => {
-      if (!cache) {
-        // Not cache
-        const schedule = {};
+    const cache = await checkCache(page);
+    if (!cache) {
+      // Not cache
+      const schedule = {};
 
-        this.data[page].payload.forEach((html) => {
-          const $ = cheerio.load(html);
-          let textTag = 'h4';
+      this.data[page].payload.forEach((html) => {
+        const $ = cheerio.load(html);
+        let textTag = 'h4';
 
-          // Search tag
-          if ($(textTag).length === 0) {
-            const findTag = {};
-            $('.expanded', '.dotted').each((i, el) => {
-              if (!findTag[el.tag]) findTag[el.tag] = 0;
-              findTag[el.tag] += 1;
-            });
-            const max = {};
-            for (const tag in findTag) {
-              if (findTag[tag] > max.n) max.tag = tag;
-            }
-            textTag = max.tag;
+        // Search tag
+        if ($(textTag).length === 0) {
+          const findTag = {};
+          $('.expanded', '.dotted').each((i, el) => {
+            if (!findTag[el.tag]) findTag[el.tag] = 0;
+            findTag[el.tag] += 1;
+          });
+          const max = {};
+          for (const tag in findTag) {
+            if (findTag[tag] > max.n) max.tag = tag;
           }
+          textTag = max.tag;
+        }
 
-          // Some receiving data
-          let specialty = '';
-          $(textTag).each((numTag, el) => {
-            if ($(el).hasClass('dotted')) specialty = $(el).text();
-            else if ($(el).hasClass('expanded')) {
-              if ($(el).text().toLowerCase().indexOf('замен') !== -1) {
-                // Replace in schedule
-                const timestamp = $(el).text().replace(/[^.0-9]/g, '');
+        // Some receiving data
+        let specialty = '';
+        $(textTag).each((numTag, el) => {
+          if ($(el).hasClass('dotted')) specialty = $(el).text();
+          else if ($(el).hasClass('expanded')) {
+            if ($(el).text().toLowerCase().indexOf('замен') !== -1) {
+              // Replace in schedule
+              const timestamp = $(el).text().replace(/[^.0-9]/g, '');
 
-                const tbody = $($(el).parent()).find('tbody').get(0);
-                const row = $(tbody).find('tr');
+              const tbody = $($(el).parent()).find('tbody').get(0);
+              const row = $(tbody).find('tr');
 
-                $(row).each((numRow, el) => {
-                  const name = $($(el).find('.group').get(0)).text();
-                  const hash = generateId(name);
+              $(row).each((numRow, el) => {
+                const name = $($(el).find('.group').get(0)).text();
+                const hash = generateId(name);
 
-                  const num = $($(el).find('.pnum').get(0)).text();
-                  const numSubject = $($(el).find('.pnum').get(0)).text();
+                const num = $($(el).find('.pnum').get(0)).text();
+                const numSubject = $($(el).find('.pnum').get(0)).text();
+                const numTeacher = $($(el).find('.pteacher').get(0)).text();
+                const denSubject = $($(el).find('.pnum').get(1)).text();
+                const denTeacher = $($(el).find('.pteacher').get(1)).text();
+
+                if (!(hash in schedule)) {
+                  schedule[hash] = {};
+                }
+                if (!('replace' in schedule)) {
+                  schedule[hash].replace = {
+                    timestamp: '',
+                    lesson: [],
+                  };
+                }
+                schedule[hash].replace.timestamp = timestamp;
+                schedule[hash].replace.lesson.push({
+                  num,
+                  numSubject,
+                  numTeacher,
+                  denSubject,
+                  denTeacher,
+                });
+              });
+            } else {
+              // Some schedule
+              const name = $(el).text();
+              const hash = generateId($(el).text());
+
+              schedule[hash] = {
+                id: hash,
+                table: [],
+                name,
+                specialty,
+              };
+
+              schedule[hash].name = name;
+
+              const parent = $(el).parent();
+              const table = $(parent).find('table');
+
+              table.each((numTable, el) => {
+                const dayWeek = $($(el).find('.groupname').get(0)).text();
+                const cellTable = $(el).find('tr');
+
+                schedule[hash].table[numTable] = {
+                  dayWeek,
+                  lesson: [],
+                };
+
+                cellTable.each((cellNum, el) => {
+                  const numSubject = $($(el).find('.pname').get(0)).text();
                   const numTeacher = $($(el).find('.pteacher').get(0)).text();
-                  const denSubject = $($(el).find('.pnum').get(1)).text();
-                  const denTeacher = $($(el).find('.pteacher').get(1)).text();
+                  const denSubject = $($(el).find('.paltname').get(0)).text();
+                  const denTeacher = $($(el).find('.paltteacher').get(0)).text();
 
-                  if (!(hash in schedule)) {
-                    schedule[hash] = {};
-                  }
-                  if (!('replace' in schedule)) {
-                    schedule[hash].replace = {
-                      timestamp: '',
-                      lesson: [],
-                    };
-                  }
-                  schedule[hash].replace.timestamp = timestamp;
-                  schedule[hash].replace.lesson.push({
-                    num,
+                  schedule[hash].table[numTable].lesson[cellNum] = {
                     numSubject,
                     numTeacher,
                     denSubject,
                     denTeacher,
-                  });
-                });
-              } else {
-                // Some schedule
-                const name = $(el).text();
-                const hash = generateId($(el).text());
-
-                schedule[hash] = {
-                  table: [],
-                  name,
-                  specialty,
-                };
-
-                schedule[hash].name = name;
-
-                const parent = $(el).parent();
-                const table = $(parent).find('table');
-
-                table.each((numTable, el) => {
-                  const dayWeek = $($(el).find('.groupname').get(0)).text();
-                  const cellTable = $(el).find('tr');
-
-                  schedule[hash].table[numTable] = {
-                    dayWeek,
-                    lesson: [],
                   };
-
-                  cellTable.each((cellNum, el) => {
-                    const numSubject = $($(el).find('.pname').get(0)).text();
-                    const numTeacher = $($(el).find('.pteacher').get(0)).text();
-                    const denSubject = $($(el).find('.paltname').get(0)).text();
-                    const denTeacher = $($(el).find('.paltteacher').get(0)).text();
-
-                    schedule[hash].table[numTable].lesson[cellNum] = {
-                      numSubject,
-                      numTeacher,
-                      denSubject,
-                      denTeacher,
-                    };
-                  });
                 });
-              }
+              });
             }
-          });
+          }
         });
-        this.completed = { page: page, payload: schedule };
-        return schedule;
-      }
-      return this.completed.schedule;
-    });
+      });
+      this.completed = { page: page, payload: schedule };
+      return schedule;
+    }
+    return this.completed.schedule;
   }
 
   async getScheduleListGroup() {
@@ -299,60 +300,105 @@ class DataPkgh {
   // ]
   async getTeacher() {
     const page = 'teacher';
-    return this.checkCache(page).then((cache) => {
-      if (!cache) {
-        const teacher = {};
-        this.data[page].payload.forEach((html, url) => {
-          const $ = cheerio.load(html);
-          const allBlock = $('.itemView');
-          allBlock.each((i, block) => {
-            const author = $($(block).find('[rel="author"]').get(0)).text();
-            const linkAuthor = $($(block).find('[rel="author"]').get(0)).attr('href');
-            const time = $($(block).find('time').get(0)).attr('datetime');
-            const tag = $($(block).find('.tag-body').get(0)).text();
-            const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
-            const text = $($(block).find('.itemIntroText').get(0)).text();
+    const cache = await this.checkCache(page);
+    if (!cache) {
+      const teacher = {};
+      this.data[page].payload.forEach((html, url) => {
+        const $ = cheerio.load(html);
+        const allBlock = $('.itemView');
+        allBlock.each((i, block) => {
+          const author = $($(block).find('[rel="author"]').get(0)).text();
+          const linkAuthor = $($(block).find('[rel="author"]').get(0)).attr('href');
+          const time = $($(block).find('time').get(0)).attr('datetime');
+          const tag = $($(block).find('.tag-body').get(0)).text();
+          const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
+          const text = $($(block).find('.itemIntroText').get(0)).text();
 
-            const downoload = () => {
-              const allLink = $($(block).find('.itemAttachments')).find('a');
-              const out = [];
-              allLink.each((i, link) => {
-                const href = $(link).attr('href');
-                const text = $(link).text();
-                out.push({
-                  link: href,
-                  text: text,
-                });
+          const downoload = () => {
+            const allLink = $($(block).find('.itemAttachments')).find('a');
+            const out = [];
+            allLink.each((i, link) => {
+              const href = $(link).attr('href');
+              const text = $(link).text();
+              out.push({
+                link: href,
+                text: text,
               });
-              return out;
-            };
-            const id = generateId(`${time}-${author}-${linkAuthor}-`);
-            teacher[id] = {
-              text: text,
-              author: {
-                text: author,
-                link: linkAuthor,
-              },
-              time: time,
-              tag: {
-                text: tag,
-                link: linkTag ? linkTag : '',
-              },
-              downoload: downoload(),
-            }
-          });
+            });
+            return out;
+          };
+          const hash = generateId(`${time}-${author}-${linkAuthor}-`);
+          teacher[hash] = {
+            id: hash,
+            text: text,
+            author: {
+              text: author,
+              link: linkAuthor,
+            },
+            time: time,
+            tag: {
+              text: tag,
+              link: linkTag ? linkTag : '',
+            },
+            downoload: downoload(),
+          }
         });
-        this.completed = { page: page, payload: teacher };
-        return teacher;
-      }
+      });
+      this.completed = { page: page, payload: teacher };
+      return teacher;
+    }
 
-      return this.completed[page].data;
-    });
+    return this.completed[page].data;
   }
 
   async getTeacherPost(hash) {
     await this.getTeacher();
     return this.completed.teacher.data[hash];
+  }
+
+  async getCall() {
+    const page = 'schedule';
+    const cache = await this.checkCache(page);
+    if (!cache) {
+      const html = this.data[page].payload.values().next().value;
+      const $ = cheerio.load(html);
+      // Fix please
+      // Cheerio cut parent tag
+      const mainCall = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
+      const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
+      const call = {
+        call: mainCall,
+        replaceCall: replaceCall,
+      };
+      this.completed = {
+        page: 'call',
+        payload: call,
+      };
+      return call;
+    }
+    return this.completed.call;
+  }
+
+  async getWarning() {
+    const page = 'schedule';
+    const cache = await this.checkCache(page);
+    if (!cache) {
+      const html = this.data[page].payload.values().next().value;
+      const $ = cheerio.load(html);
+      const warning = (() => {
+        const w = $('.custom_max-attention').get(0);
+        $(w).find('table').each((i, el) => {
+          $(el).remove();
+        });
+        return $(w).text();
+      })();
+      this.completed = {
+        page: 'warning',
+        payload: warning,
+      };
+      return warning;
+    }
+    return this.completed.warning;
   }
 }
 
