@@ -2,6 +2,7 @@ const translit = require('cyrillic-to-translit-js');
 const cheerio = require('cheerio');
 const tableToJson = require('html-table-to-json');
 const fetch = require('node-fetch');
+const excelToJson = require('convert-excel-to-json');
 
 function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
@@ -12,6 +13,8 @@ class DataPkgh {
     // timeCache default 900000mls so 15min
     this.cache = cache;
     this.timeCache = timeCache;
+
+    this.domain = 'https://pkgh.edu.ru';
 
     // Payload of Map string url => string html
     this._data = {
@@ -282,8 +285,7 @@ class DataPkgh {
   }
 
   // Struct data Teacher
-  // [
-  //   {
+  //   id: {
   //    id: hash(text+author+linkAuthor),
   //    text: text,
   //    author: {
@@ -297,7 +299,6 @@ class DataPkgh {
   //    },
   //    downoload: linkDownolad
   //   }
-  // ]
   async getTeacher() {
     const page = 'teacher';
     const cache = await this.checkCache(page);
@@ -399,6 +400,37 @@ class DataPkgh {
       return warning;
     }
     return this.completed.warning;
+  }
+
+  async getChess() {
+    const page = 'schedule';
+    const cache = await this.checkCache(page);
+    if (!cache) {
+      const html = this.data[page].payload.values().next().value;
+      const $ = cheerio.load(html);
+      const href = (() => {
+        let url = null;
+        $('aside').find('a').each((i, el) => {
+          if ($(el).text().toLowerCase().indexOf('шахматка') !== -1) {
+            url = $(el).attr('href');
+            if (url.indexOf('http://') === -1) {
+              url = `${this.domain}/${url}`;
+            }
+          }
+        });
+        return url;
+      })();
+
+      const xl = excelToJson({
+        source: await fetch(href).then((r) => r.buffer()).then((body) => { return body; }),
+      });
+      this.completed = {
+        page: 'chess',
+        payload: xl,
+      };
+      return xl;
+    }
+    return this.completed.chess;
   }
 }
 
