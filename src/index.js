@@ -9,10 +9,13 @@ function generateId(str) {
 }
 
 class DataPkgh {
-  constructor(cache = true, timeCache = 900000) {
+  constructor(opts = {
+    cache: true,
+    timeCache: 900000,
+  }) {
     // timeCache default 900000mls so 15min
-    this.cache = cache;
-    this.timeCache = timeCache;
+    this.cache = opts.cache;
+    this.timeCache = opts.timeCache;
 
     this.domain = 'https://pkgh.edu.ru';
 
@@ -156,7 +159,7 @@ class DataPkgh {
   async getSchedule() {
     const page = 'schedule';
 
-    const cache = await checkCache(page);
+    const cache = await this.checkCache(page);
     if (!cache) {
       // Not cache
       const schedule = {};
