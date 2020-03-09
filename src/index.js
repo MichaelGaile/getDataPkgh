@@ -293,7 +293,7 @@ class DataPkgh {
         return out;
       case 'specialty':
         d.forEach((el) => {
-          out[generateId(el.specialty)] = el;
+          out[el.specialty] = el;
         });
         return out;
       default:
