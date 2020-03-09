@@ -272,14 +272,33 @@ class DataPkgh {
     return this.completed.schedule;
   }
 
-  async getScheduleListGroup() {
-    const page = 'schedule';
-    return this.getSchedule().then((data) => Object.keys(data).map((hash) => {
+  // Sort is enum = array, id, specialty
+  async getScheduleListGroup(sort = 'id') {
+    const data = await this.getSchedule();
+    const d = Object.keys(data).map((hash) => {
       const obj = {};
       obj.id = hash;
-      obj.name = this.completed[page].data[hash].name;
+      obj.name = data[hash].name;
+      obj.specialty = data[hash].specialty;
       return obj;
-    }));
+    });
+    const out = {};
+    switch (sort) {
+      case 'array':
+        return d;
+      case 'id':
+        d.forEach((el) => {
+          out[el.id] = el;
+        });
+        return out;
+      case 'specialty':
+        d.forEach((el) => {
+          out[generateId(el.specialty)] = el;
+        });
+        return out;
+      default:
+        return null;
+    }
   }
 
   async getScheduleGroup(hash) {
