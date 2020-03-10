@@ -84,6 +84,16 @@ class DataPkgh {
     return this._data;
   }
 
+  set now(data) {
+    this._now = data;
+  }
+
+  get now() {
+    const data = this._now;
+    this._now = null;
+    return data;
+  }
+
   static parseUrl(url) {
     function parse(str) {
       if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
@@ -271,7 +281,7 @@ class DataPkgh {
       this.now = schedule;
       return this;
     }
-    this.now = this.completed.schedule;
+    this.now = this.completed.schedule.data;
     return this;
   }
 
@@ -305,11 +315,6 @@ class DataPkgh {
     //}
     //return out;
   //}
-
-  async getScheduleGroup(hash) {
-    await this.getSchedule();
-    return this.completed.schedule.data[hash];
-  }
 
   // Struct data Teacher
   //   id: {
@@ -369,14 +374,16 @@ class DataPkgh {
               link: linkTag ? linkTag : '',
             },
             downoload: downoload(),
-          }
+          };
         });
       });
       this.completed = { page: page, payload: teacher };
-      return teacher;
+      this.now = teacher;
+      return this;
     }
 
-    return this.completed[page].data;
+    this.now = this.completed[page].data;
+    return this;
   }
 
   async getTeacherPost(hash) {
@@ -426,7 +433,8 @@ class DataPkgh {
       };
       return warning;
     }
-    return this.completed.warning;
+    this.now = this.completed.warning.data;
+    return this;
   }
 
   async getChess() {
@@ -457,7 +465,7 @@ class DataPkgh {
       };
       return xl;
     }
-    return this.completed.chess;
+    return this.completed.chess.data;
   }
 
   async toArray() {
@@ -469,7 +477,6 @@ class DataPkgh {
   async firstIndex(index) {
     let data = await this.now;
     const out = {};
-    console.log(data);
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
     data.forEach((item) => {
       out[item[index]] = item;
@@ -478,7 +485,19 @@ class DataPkgh {
   }
 
   async groupIndex(index) {
-    return null;
+    let data = await this.now;
+    if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
+
+    const out = {};
+    data.map((item) => item[index])
+      .filter((item, i, self) => self.indexOf(item) === i)
+      .forEach((spec) => {
+        out[spec] = [];
+        data.forEach((item) => {
+          out[spec].push(item);
+        });
+      });
+    return out;
   }
 }
 
