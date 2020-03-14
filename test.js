@@ -4,20 +4,14 @@ const dPkgh = require('./src/index.js');
 
 const pkgh = new dPkgh();
 
-test('Schedule', (t) => {
-  return pkgh.getSchedule().then((r) => {
-    t.is(true, !!r[Object.keys(r)[0]].id);
-  });
-});
+test('Schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((r) => {
+  t.is(true, (r instanceof Array && r.length !== 0));
+}));
 
-test('Teacher', (t) => {
-  return pkgh.getTeacher().then((r) => {
-    t.is(true, !!r[Object.keys(r)[0]].id);
-  });
-});
+test('Teacher', (t) => pkgh.getTeacher().then((r) => r.toArray()).then((r) => {
+  t.is(true, (r instanceof Array && r.length !== 0));
+}));
 
-test('Chess', (t) => {
-  return pkgh.getChess().then((r) => {
-    t.is(true, !!r);
-  });
-});
+test('Chess', (t) => pkgh.getChess().then((r) => {
+  t.is(true, !!r);
+}));

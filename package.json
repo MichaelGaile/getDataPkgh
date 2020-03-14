@@ -1,18 +1,18 @@
 {
   "name": "get-data-pkgh",
-  "version": "0.0.180",
+  "version": "0.0.184",
   "description": "Getting data from the College's website",
   "main": "src/index.js",
   "repository": "https://github.com/MichaelGaile/get-data-pkgh.git",
   "author": "MichaelGaile",
   "license": "GNU-3.0",
   "devDependencies": {
+    "ava": "^3.5.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.20.1",
-    "eslint-plugin-node": "^11.0.0",
-    "ava": "^3.5.0"
+    "eslint-plugin-node": "^11.0.0"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.3",
@@ -20,10 +20,14 @@
     "cyrillic-to-translit-js": "^3.0.1",
     "html-table-to-json": "^1.0.0",
     "htmlparser2": "^4.0.0",
+    "moment": "^2.24.0",
     "node-fetch": "^2.6.0",
     "tabletojson": "^2.0.0"
   },
   "scripts": {
     "test": "ava"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
   }
 }

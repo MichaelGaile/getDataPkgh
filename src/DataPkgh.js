@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const tableToJson = require('html-table-to-json');
 const fetch = require('node-fetch');
 const excelToJson = require('convert-excel-to-json');
+const moment = require('moment');
 
 function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
@@ -61,6 +62,8 @@ class DataPkgh {
     this._data = updateUrl(this._data);
 
     this.now = null;
+
+    moment.locale('ru');
   }
 
   set completed(data) {
@@ -200,7 +203,7 @@ class DataPkgh {
           else if ($(el).hasClass('expanded')) {
             if ($(el).text().toLowerCase().indexOf('замен') !== -1) {
               // Replace in schedule
-              const timestamp = $(el).text().replace(/[^.0-9]/g, '');
+              const timestamp = new Date(moment($(el).text().replace(/[^.0-9]/g, ''), 'dd.mm.yyyy').format());
 
               const tbody = $($(el).parent()).find('tbody').get(0);
               const row = $(tbody).find('tr');
@@ -210,27 +213,27 @@ class DataPkgh {
                 const hash = generateId(name);
 
                 const num = $($(el).find('.pnum').get(0)).text();
-                const numSubject = $($(el).find('.pnum').get(0)).text();
-                const numTeacher = $($(el).find('.pteacher').get(0)).text();
-                const denSubject = $($(el).find('.pnum').get(1)).text();
-                const denTeacher = $($(el).find('.pteacher').get(1)).text();
+                const numSub = $($(el).find('.pnum').get(0)).text();
+                const numTea = $($(el).find('.pteacher').get(0)).text();
+                const denSub = $($(el).find('.pnum').get(1)).text();
+                const denTea = $($(el).find('.pteacher').get(1)).text();
 
                 if (!(hash in schedule)) {
                   schedule[hash] = {};
                 }
                 if (!('replace' in schedule)) {
                   schedule[hash].replace = {
-                    timestamp: '',
+                    timestamp: null,
                     lesson: [],
                   };
                 }
                 schedule[hash].replace.timestamp = timestamp;
                 schedule[hash].replace.lesson.push({
-                  num,
-                  numSubject,
-                  numTeacher,
-                  denSubject,
-                  denTeacher,
+                  number: num,
+                  numSubject: numSub,
+                  numTeacher: numTea,
+                  denSubject: denSub,
+                  denTeacher: denTea,
                 });
               });
             } else {
@@ -260,16 +263,16 @@ class DataPkgh {
                 };
 
                 cellTable.each((cellNum, el) => {
-                  const numSubject = $($(el).find('.pname').get(0)).text();
-                  const numTeacher = $($(el).find('.pteacher').get(0)).text();
-                  const denSubject = $($(el).find('.paltname').get(0)).text();
-                  const denTeacher = $($(el).find('.paltteacher').get(0)).text();
+                  const numSub = $($(el).find('.pname').get(0)).text();
+                  const numTea = $($(el).find('.pteacher').get(0)).text();
+                  const denSub = $($(el).find('.paltname').get(0)).text();
+                  const denTea = $($(el).find('.paltteacher').get(0)).text();
 
                   schedule[hash].table[numTable].lesson[cellNum] = {
-                    numSubject,
-                    numTeacher,
-                    denSubject,
-                    denTeacher,
+                    numSubject: numSub,
+                    numTeacher: numTea,
+                    denSubject: denSub,
+                    denTeacher: denTea,
                   };
                 });
               });
@@ -342,7 +345,8 @@ class DataPkgh {
         allBlock.each((i, block) => {
           const author = $($(block).find('[rel="author"]').get(0)).text();
           const linkAuthor = $($(block).find('[rel="author"]').get(0)).attr('href');
-          const time = $($(block).find('time').get(0)).attr('datetime');
+          // new Date(a('08 дек 2019 09:50', 'DD MMMM yyyy HH:mm').format())
+          const time = new Date(moment($($(block).find('time').get(0)).attr('datetime'), 'DD MMMM yyyy HH:mm').format());
           const tag = $($(block).find('.tag-body').get(0)).text();
           const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
           const text = $($(block).find('.itemIntroText').get(0)).text();
@@ -391,6 +395,8 @@ class DataPkgh {
     return this.completed.teacher.data[hash];
   }
 
+  // No sort
+  // return moment value
   async getCall() {
     const page = 'schedule';
     const cache = await this.checkCache(page);
@@ -414,6 +420,8 @@ class DataPkgh {
     return this.completed.call;
   }
 
+  // No sort
+  // return moment value
   async getWarning() {
     const page = 'schedule';
     const cache = await this.checkCache(page);
@@ -437,6 +445,8 @@ class DataPkgh {
     return this;
   }
 
+  // No sort
+  // return moment value
   async getChess() {
     const page = 'schedule';
     const cache = await this.checkCache(page);
