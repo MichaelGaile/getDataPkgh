@@ -4,6 +4,7 @@ const tableToJson = require('html-table-to-json');
 const fetch = require('node-fetch');
 const excelToJson = require('convert-excel-to-json');
 const moment = require('moment');
+const crypto = require('crypto');
 
 function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
@@ -131,11 +132,11 @@ class DataPkgh {
     }
     if (!this.cache || (Date.now() - this.data[page].timestamp) > this.timeCache) {
       for (const [url, html] of this.data[page].payload) {
-        const body = await fetch(url).then((r) => r.text()).then((body) => body);
+        const payload = await fetch(url).then((r) => r.text()).then((body) => body);
         this.data = {
-          page: page,
-          url: url,
-          payload: body,
+          page,
+          url,
+          payload,
         };
       }
       return false;
@@ -263,16 +264,16 @@ class DataPkgh {
                 };
 
                 cellTable.each((cellNum, el) => {
-                  const numSub = $($(el).find('.pname').get(0)).text();
-                  const numTea = $($(el).find('.pteacher').get(0)).text();
-                  const denSub = $($(el).find('.paltname').get(0)).text();
-                  const denTea = $($(el).find('.paltteacher').get(0)).text();
+                  const numSubject = $($(el).find('.pname').get(0)).text();
+                  const numTeacher = $($(el).find('.pteacher').get(0)).text();
+                  const denSubject = $($(el).find('.paltname').get(0)).text();
+                  const denTeacher = $($(el).find('.paltteacher').get(0)).text();
 
                   schedule[hash].table[numTable].lesson[cellNum] = {
-                    numSubject: numSub,
-                    numTeacher: numTea,
-                    denSubject: denSub,
-                    denTeacher: denTea,
+                    numSubject,
+                    numTeacher,
+                    denSubject,
+                    denTeacher,
                   };
                 });
               });
@@ -280,44 +281,32 @@ class DataPkgh {
           }
         });
       });
-      this.completed = { page: page, payload: schedule };
+      const isDenominator = (() => {
+        const html = Array.from(Array.from(this.data[page].payload)[0])[1];
+        const $ = cheerio.load(html);
+        let out = null;
+        $('script').each((i, script) => {
+          const htmlScript = $(script).html().split(' ').join('')
+            .toLowerCase();
+          if (htmlScript.indexOf('weeknum=') !== -1) {
+            out = Number(htmlScript.split('weeknum=')[1].split(';')[0]) % 2 === 0;
+          }
+        });
+        return out;
+      })();
+      this.completed = {
+        page,
+        payload: {
+          schedule,
+          isDenominator,
+        },
+      };
       this.now = schedule;
       return this;
     }
     this.now = this.completed.schedule.data;
     return this;
   }
-
-  // Sort is enum = array, id, specialty
-  //async getScheduleListGroup() {
-    //const data = await this.getSchedule();
-    //const d = Object.keys(data).map((hash) => {
-      //const obj = {};
-      //obj.id = hash;
-      //obj.name = data[hash].name;
-      //obj.specialty = data[hash].specialty;
-      //return obj;
-    //});
-    //const out = {};
-    //out.prototype = sort;
-    //switch (sort) {
-      //case 'array':
-        //return d;
-      //case 'id':
-        //d.forEach((el) => {
-          //out[el.id] = el;
-        //});
-        //break;
-      //case 'specialty':
-        //d.forEach((el) => {
-          //out[el.specialty] = el;
-        //});
-        //break;
-      //default:
-        //return null;
-    //}
-    //return out;
-  //}
 
   // Struct data Teacher
   //   id: {
@@ -351,7 +340,7 @@ class DataPkgh {
           const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
           const text = $($(block).find('.itemIntroText').get(0)).text();
 
-          const downoload = () => {
+          const download = () => {
             const allLink = $($(block).find('.itemAttachments')).find('a');
             const out = [];
             allLink.each((i, link) => {
@@ -365,34 +354,33 @@ class DataPkgh {
             return out;
           };
           const hash = generateId(`${time}-${author}-${linkAuthor}-`);
+
           teacher[hash] = {
             id: hash,
-            text: text,
+            text,
             author: {
               text: author,
               link: linkAuthor,
             },
-            time: time,
+            time,
             tag: {
               text: tag,
-              link: linkTag ? linkTag : '',
+              link: linkTag,
             },
-            downoload: downoload(),
+            downoload: download(),
           };
         });
       });
-      this.completed = { page: page, payload: teacher };
+      this.completed = {
+        page,
+        payload: teacher,
+      };
       this.now = teacher;
       return this;
     }
 
     this.now = this.completed[page].data;
     return this;
-  }
-
-  async getTeacherPost(hash) {
-    await this.getTeacher();
-    return this.completed.teacher.data[hash];
   }
 
   // No sort
@@ -405,17 +393,18 @@ class DataPkgh {
       const $ = cheerio.load(html);
       // Fix please
       // Cheerio cut parent tag
-      const mainCall = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
+      const call = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
       const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
-      const call = {
-        call: mainCall,
-        replaceCall: replaceCall,
+      const payload = {
+        call,
+        replaceCall,
       };
+      payload.id = crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex');
       this.completed = {
         page: 'call',
-        payload: call,
+        payload,
       };
-      return call;
+      return payload;
     }
     return this.completed.call;
   }
@@ -435,6 +424,7 @@ class DataPkgh {
         });
         return $(w).text();
       })();
+      warning.id = crypto.createHash('md5').update(JSON.stringify(warning)).digest('hex');
       this.completed = {
         page: 'warning',
         payload: warning,
@@ -469,6 +459,7 @@ class DataPkgh {
       const xl = excelToJson({
         source: await fetch(href).then((r) => r.buffer()).then((body) => { return body; }),
       });
+      xl.id = crypto.createHash('md5').update(JSON.stringify(xl)).digest('hex');
       this.completed = {
         page: 'chess',
         payload: xl,
