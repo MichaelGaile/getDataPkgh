@@ -1,6 +1,6 @@
 {
   "name": "get-data-pkgh",
-  "version": "0.0.185",
+  "version": "0.0.186",
   "description": "Getting data from the College's website",
   "main": "src/index.js",
   "repository": "https://github.com/MichaelGaile/get-data-pkgh.git",

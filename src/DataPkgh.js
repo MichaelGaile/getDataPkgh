@@ -10,6 +10,12 @@ function generateId(str) {
   return translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
 }
 
+//
+// Struct data
+// I don 't know how to make the main data output easy to use
+//                              -----
+//
+
 class DataPkgh {
   constructor(opts = {
     cache: true,
@@ -49,6 +55,8 @@ class DataPkgh {
         data: null,
       },
     };
+
+    this.main = 'main';
 
     // Parsing url's
     const updateUrl = (data) => {
@@ -171,11 +179,14 @@ class DataPkgh {
    *
    */
 
-  async getSchedule() {
+  async getSchedule(opts = {
+    main: true,
+  }) {
     const page = 'schedule';
 
     const cache = await this.checkCache(page);
     if (!cache) {
+      const error = [];
       // Not cache
       const schedule = {};
 
@@ -292,16 +303,30 @@ class DataPkgh {
             out = Number(htmlScript.split('weeknum=')[1].split(';')[0]) % 2 === 0;
           }
         });
+        if (!out) {
+          out = Math.round((new Date().getTime() - new Date(new Date().getFullYear(),
+            new Date().getMonth(), 0).getTime()) / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
+          error.push('isDenominator not correct');
+        }
         return out;
       })();
+
+      const payload = opts.main ? {
+        main: {
+          timestamp: Date.now(),
+          isDenominator,
+          error: [],
+        },
+        ...schedule,
+      } : schedule;
+
       this.completed = {
         page,
-        payload: {
-          schedule,
-          isDenominator,
-        },
+        payload,
       };
-      this.now = schedule;
+
+      this.now = payload;
+
       return this;
     }
     this.now = this.completed.schedule.data;
@@ -396,10 +421,12 @@ class DataPkgh {
       const call = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
       const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
       const payload = {
-        call,
-        replaceCall,
+        id: crypto.createHash('md5').update(JSON.stringify({ call, replaceCall })).digest('hex'),
+        data: {
+          call,
+          replaceCall,
+        },
       };
-      payload.id = crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex');
       this.completed = {
         page: 'call',
         payload,
@@ -424,12 +451,16 @@ class DataPkgh {
         });
         return $(w).text();
       })();
-      warning.id = crypto.createHash('md5').update(JSON.stringify(warning)).digest('hex');
+      const payload = {
+        id: crypto.createHash('md5').update(JSON.stringify(warning)).digest('hex'),
+        timestamp: Date.now(),
+        data: warning,
+      };
       this.completed = {
         page: 'warning',
-        payload: warning,
+        payload,
       };
-      return warning;
+      return payload;
     }
     this.now = this.completed.warning.data;
     return this;
@@ -457,26 +488,41 @@ class DataPkgh {
       })();
 
       const xl = excelToJson({
-        source: await fetch(href).then((r) => r.buffer()).then((body) => { return body; }),
+        source: await fetch(href).then((r) => r.buffer()),
       });
-      xl.id = crypto.createHash('md5').update(JSON.stringify(xl)).digest('hex');
+      const payload = {
+        id: crypto.createHash('md5').update(JSON.stringify(xl)).digest('hex'),
+        data: xl,
+      };
       this.completed = {
         page: 'chess',
-        payload: xl,
+        payload,
       };
-      return xl;
+      return payload;
     }
     return this.completed.chess.data;
   }
 
-  async toArray() {
-    const data = await this.now;
+  async toArray(d = null) {
+    const data = d === null ? await this.now : d;
+    if (this.main in data) delete data.main;
     if (data instanceof Array) return data;
     return Object.keys(data).map((key) => data[key]);
   }
 
-  async firstIndex(index) {
-    let data = await this.now;
+  async getMain(callback, d = null) {
+    let data = d === null ? await this.now : d;
+    const main = this.main in data ? data.main : null;
+    data = await callback(data);
+    return main ? {
+      main,
+      data,
+    } : data;
+  }
+
+  async firstIndex(index, d = null) {
+    let data = d === null ? await this.now : d;
+    if (this.main in data) delete data.main;
     const out = {};
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
     data.forEach((item) => {
@@ -485,8 +531,9 @@ class DataPkgh {
     return out;
   }
 
-  async groupIndex(index) {
-    let data = await this.now;
+  async groupIndex(index, d = null) {
+    let data = d === null ? await this.now : d;
+    if (this.main in data) delete data.main;
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
 
     const out = {};
