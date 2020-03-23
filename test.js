@@ -2,7 +2,7 @@ const test = require('ava');
 
 const dPkgh = require('./src/index.js');
 
-const pkgh = new dPkgh();
+const pkgh = new dPkgh({ cache: true, logLevel: 'debug' });
 
 test('Schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((r) => {
   t.is(true, (r instanceof Array && r.length !== 0));

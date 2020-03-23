@@ -10,14 +10,17 @@
     "ava": "^3.5.0",
     "eslint": "^6.8.0",
     "eslint-config-airbnb": "^18.0.1",
-    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-config-airbnb-base": "^14.1.0",
     "eslint-plugin-import": "^2.20.1",
-    "eslint-plugin-node": "^11.0.0"
+    "eslint-plugin-node": "^11.0.0",
+    "tern": "^0.24.3"
   },
   "dependencies": {
+    "chalk": "^3.0.0",
     "cheerio": "^1.0.0-rc.3",
     "convert-excel-to-json": "^1.6.1",
     "cyrillic-to-translit-js": "^3.0.1",
+    "html-minifier": "^4.0.0",
     "html-table-to-json": "^1.0.0",
     "htmlparser2": "^4.0.0",
     "moment": "^2.24.0",
