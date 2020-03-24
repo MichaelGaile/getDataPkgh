@@ -1,26 +1,14 @@
-const translit = require('cyrillic-to-translit-js');
 const cheerio = require('cheerio');
 const tableToJson = require('html-table-to-json');
 const fetch = require('node-fetch');
 const excelToJson = require('convert-excel-to-json');
 const moment = require('moment');
-const crypto = require('crypto');
 const { minify } = require('html-minifier');
 
 const Console = require('./Console.js');
+const generateId = require('./generateId.js');
 
 const console = new Console();
-
-/**
- * generate id with a string base, removing all characters except Russian and English
- *
- * @param {Object} hash use md5 to create an id
- * @returns {String} returns an id based on a string
- */
-function generateId(str, hash = true) {
-  const string = translit().transform((Array.from(str).filter((s) => /^([a-zа-яё]+|\d+)$/i.test(s))).join(''));
-  return hash ? crypto.createHash('md5').update(string) : string;
-}
 
 // DataPkgh
 // cache -> on / off load data from the http://pkgh
@@ -33,9 +21,9 @@ function generateId(str, hash = true) {
 //  load: { schedyle: 'HTML' }
 //  load: { 'URL': 'HTML' }
 class DataPkgh {
-  constructor(opts = {}) {
+  constructor(userOpts = {}) {
     // Set default opts
-    const nowOpts = (() => {
+    const opts = (() => {
       const defaultOpts = {
         cache: false,
         timeCache: 900000,
@@ -43,21 +31,21 @@ class DataPkgh {
         single: 'single',
         load: {},
       };
-      return Object.assign(defaultOpts, opts);
+      return Object.assign(defaultOpts, userOpts);
     })();
 
-    console.rechangeLevel(nowOpts.logLevel);
+    console.rechangeLevel(opts.logLevel);
 
     // Cache
     // Needed for needed to reduce requests to the main server
     // If there are errors your ip maybe blocked
     // Use dynamic proxies for guaranteed data retrieval
-    this.cache = nowOpts.cache;
+    this.cache = opts.cache;
     // The time when data will be updated
     // 15 minutes was chosen empirically as the optimal indicator
     // of site variability and minimal load
     // timeCache default 900000mls so 15min
-    this.timeCache = nowOpts.timeCache;
+    this.timeCache = opts.timeCache;
 
     // Data
     // Main data where are they stored
@@ -142,20 +130,10 @@ class DataPkgh {
       return out;
     })();
 
-    // Load load
-    // Install load in data html
-    if (Object.keys(nowOpts.load).length !== 0) {
-      Object.keys(nowOpts.load).forEach((index) => {
-        if (index.indexOf('http') === 0) {
-          this.html = { url: index, payload: nowOpts.load[index] };
-        } else {
-          this.html = {
-            url: this.data[index].url[0],
-            payload: nowOpts.load[index],
-          };
-        }
-      });
-    }
+    // this.lockNet = false;
+//
+    // this.constructor.newLoad(opts.load);
+
     // Now!
     // For transmitting data via this
     // Only for using data formatting
@@ -165,7 +143,7 @@ class DataPkgh {
     // Name of the property for the final data
     // Is used to obtain a single data point
     // To get this data, use the method <<getSingle>>
-    this._single = nowOpts.single;
+    this._single = opts.single;
 
     moment.locale('ru');
   }
@@ -206,7 +184,7 @@ class DataPkgh {
   }
 
   set html(data) {
-    this._html[data.url ? data.url : Object.keys(data)] = {
+    this._html[data.url] = {
       payload: data.payload,
       timestamp: Date.now(),
     };
@@ -214,6 +192,26 @@ class DataPkgh {
 
   get html() {
     return this._html;
+  }
+
+  static newLoad(data) {
+    // Load load
+    // Install load in data html
+    if (Object.keys(data).length !== 0) {
+      Object.keys(data).forEach((index) => {
+        if (index.indexOf('http') === 0) {
+          this.html = { url: index, payload: data[index] };
+        } else {
+          this.html = {
+            url: this.data[index].url[0],
+            payload: data[index],
+          };
+        }
+        this.lockNet = true;
+      });
+    } else {
+      this.lockNet = false;
+    }
   }
 
   /**
@@ -254,13 +252,14 @@ class DataPkgh {
   /**
    * Check html data storage time
    *
-   * @param {String } page Page schedule, teacher... Multiple links linked to a page
+   * @param {String} page Page schedule, teacher... Multiple links linked to a page
    * @param {Array or Number} l Limit where is the first value skip and the last restriction
-   * @param {} 0]
    * @returns {Boolean} Value allow cache
    */
   async checkCache(page, l = [0, 0]) {
     if (!(page in this.data)) throw new Error('page is not exists');
+    if (this.lockNet) return false;
+
     const limit = (() => {
       const { length } = this.data[page].url;
       if (l instanceof Number) return [l, length];
@@ -347,9 +346,13 @@ class DataPkgh {
    * @param {Object} opts A set of possible options
    * @returns {This} Returns this with the ability to get data in a convenient form
    */
-  async getSchedule(opts = {
-    single: true,
-  }) {
+  async getSchedule(userOpts = {}) {
+    const opts = (() => {
+      const defaultOpts = {
+        single: true, 
+      }
+      return Object.assign(defaultOpts, userOpts);
+    })();
     const page = 'schedule';
 
     const cache = await this.checkCache(page);
@@ -462,7 +465,8 @@ class DataPkgh {
         if (!out) {
           out = Math.round((new Date().getTime() - new Date(new Date().getFullYear(),
             new Date().getMonth(), 0).getTime()) / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
-          error.push('isDenominator not correct');
+          error.push('isDenominator is not correct');
+          console.warn('Schedule: isDenominator is not correct')
         }
         return out;
       })();
@@ -507,12 +511,12 @@ class DataPkgh {
   //   }
   /**
    * Prepares data for convenient use
-   *
+   * @param {Array or Number} limit Limit load page from 0 to 9
    * @returns {This} You can use the method to format data to the desired format
    */
-  async getTeacher() {
+  async getTeacher(limit = [0, 0]) {
     const page = 'teacher';
-    const cache = await this.checkCache(page);
+    const cache = await this.checkCache(page, limit);
     if (!cache) {
       const teacher = {};
       this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
@@ -588,7 +592,7 @@ class DataPkgh {
       const call = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
       const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
       const payload = {
-        id: crypto.createHash('md5').update(JSON.stringify({ call, replaceCall })).digest('hex'),
+        id: generateId(JSON.stringify({call, replaceCall})),
         data: {
           call,
           replaceCall,
@@ -624,7 +628,7 @@ class DataPkgh {
         return $(w).text();
       })();
       const payload = {
-        id: crypto.createHash('md5').update(JSON.stringify(warning)).digest('hex'),
+        id: generateId(warning),
         timestamp: Date.now(),
         data: warning,
       };
@@ -647,7 +651,7 @@ class DataPkgh {
    */
   async getChess() {
     const page = 'chess';
-    const cache = await this.checkCache(page);
+    const cache = await this.checkCache('schedule');
     if (!cache) {
       const html = this.data[page].url.map((url) => this.html[url].payload)[0];
       const $ = cheerio.load(html);
@@ -669,7 +673,7 @@ class DataPkgh {
         source: await fetch(href).then((r) => r.buffer()),
       });
       const payload = {
-        id: crypto.createHash('md5').update(JSON.stringify(xl)).digest('hex'),
+        id: generateId(JSON.stringify(xl)),
         data: xl,
       };
       this.completed = {
@@ -687,8 +691,8 @@ class DataPkgh {
    * @param {Object or Array} d Parameter data to bypass 'now' only for use inside other functions
    */
   async toArray(d = null) {
-    const data = await (d === null ? this.now : d);
-    if (this.single in data) delete data.single;
+    const data = d === null ? await this.now : d;
+    if (this.single in data) delete data[this.single];
     if (data instanceof Array) return data;
     return Object.keys(data).map((key) => data[key]);
   }
@@ -701,13 +705,17 @@ class DataPkgh {
    * @returns {Object or Array} Returns data in a convenient format along with individual data
    */
   async getSingle(callback, d = null) {
-    let data = await this.firstIndex('id', (d === null ? this.now : d));
+    let data = await (d === null ? this.now : d);
+    if (!(this.single in data)) {
+      console.warn('Single not found');
+      return await callback(data);
+    }
     const { single } = data;
     data = await callback(data);
-    return single ? {
+    return {
       single,
       data,
-    } : data;
+    };
   }
 
   /**
@@ -720,7 +728,7 @@ class DataPkgh {
    */
   async firstIndex(index, d = null) {
     let data = await (d === null ? this.now : d);
-    if (this.single in data) delete data.single;
+    if (this.single in data) delete data[this.single];
     const out = {};
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
     data.forEach((item) => {
@@ -738,7 +746,7 @@ class DataPkgh {
    */
   async groupIndex(index, d = null) {
     let data = d === null ? await this.now : d;
-    if (this.single in data) delete data.single;
+    if (this.single in data) delete data[this.single];
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
 
     const out = {};
@@ -755,4 +763,3 @@ class DataPkgh {
 }
 
 module.exports = DataPkgh;
-module.exports.generateId = generateId;
