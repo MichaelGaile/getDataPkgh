@@ -1,4 +1,5 @@
 module.exports = {
+  parser: 'babel-eslint',
   env: {
     es6: true,
     node: true,
@@ -28,6 +29,12 @@ module.exports = {
       { 
         "allowAfterThis": true,
         "enforceInMethodNames": true,
+      },
+    ],
+    "consistent-return": [
+      2,
+      {
+        "treatUndefinedAsUnspecified": true,
       },
     ],
   },
