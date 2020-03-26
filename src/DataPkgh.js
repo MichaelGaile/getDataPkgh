@@ -27,8 +27,7 @@ class DataPkgh {
       const defaultOpts = {
         cache: false,
         timeCache: 900000,
-        logLevel: 'log',
-        single: 'single',
+        logLevel: 'error',
         load: {},
       };
       return Object.assign(defaultOpts, userOpts);
@@ -131,7 +130,7 @@ class DataPkgh {
     })();
 
     // this.lockNet = false;
-//
+    //
     // this.constructor.newLoad(opts.load);
 
     // Now!
@@ -143,7 +142,7 @@ class DataPkgh {
     // Name of the property for the final data
     // Is used to obtain a single data point
     // To get this data, use the method <<getSingle>>
-    this._single = opts.single;
+    // this._single = opts.single;
 
     moment.locale('ru');
   }
@@ -349,8 +348,8 @@ class DataPkgh {
   async getSchedule(userOpts = {}) {
     const opts = (() => {
       const defaultOpts = {
-        single: true, 
-      }
+        single: true,
+      };
       return Object.assign(defaultOpts, userOpts);
     })();
     const page = 'schedule';
@@ -359,53 +358,21 @@ class DataPkgh {
     if (!cache) {
       const error = [];
       // Not cache
-      const schedule = {};
+      const schedule = { };
 
       this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
         const $ = cheerio.load(html);
         const mainTag = 'h4';
 
-        // Some receiving data
         let specialty = '';
+
+        let tagReplace = null;
+
         $(mainTag).each((numTag, tag) => {
           if ($(tag).hasClass('dotted')) specialty = $(tag).text();
           else if ($(tag).hasClass('expanded')) {
-            if ($(tag).text().toLowerCase().indexOf('замен') !== -1) {
-              // Replace in schedule
-              const timestamp = new Date(moment($(tag).text().replace(/[^.0-9]/g, ''), 'dd.mm.yyyy').format());
-
-              const tbody = $($(tag).parent()).find('tbody').get(0);
-              const rows = $(tbody).find('tr');
-
-              $(rows).each((numRow, row) => {
-                const name = $($(row).find('.group').get(0)).text();
-                const hash = generateId(name);
-
-                const num = $($(row).find('.pnum').get(0)).text();
-                const numSub = $($(row).find('.pnum').get(0)).text();
-                const numTea = $($(row).find('.pteacher').get(0)).text();
-                const denSub = $($(row).find('.pnum').get(1)).text();
-                const denTea = $($(row).find('.pteacher').get(1)).text();
-
-                if (!(hash in schedule)) {
-                  schedule[hash] = {};
-                }
-                if (!('replace' in schedule)) {
-                  schedule[hash].replace = {
-                    timestamp: null,
-                    lesson: [],
-                  };
-                }
-                schedule[hash].replace.timestamp = timestamp;
-                schedule[hash].replace.lesson.push({
-                  number: num,
-                  numSubject: numSub,
-                  numTeacher: numTea,
-                  denSubject: denSub,
-                  denTeacher: denTea,
-                });
-              });
-            } else {
+            if ($(tag).text().toLowerCase().indexOf('замен') !== -1) tagReplace = tag;
+            else {
               // Some schedule
               const name = $(tag).text();
               const hash = generateId($(tag).text());
@@ -415,6 +382,10 @@ class DataPkgh {
                 table: [],
                 name,
                 specialty,
+                replace: {
+                  timestamp: null,
+                  lesson: [],
+                },
               };
 
               schedule[hash].name = name;
@@ -448,6 +419,40 @@ class DataPkgh {
             }
           }
         });
+
+        // Completion replace
+        // Execution is always the last
+        if (tagReplace !== null) {
+          const timestamp = new Date(moment($(tagReplace).text().replace(/[^.0-9]/g, ''), 'dd.mm.yyyy').format());
+
+          const tbody = $($(tagReplace).parent()).find('tbody').get(0);
+          const rows = $(tbody).find('tr');
+
+          $(rows).each((numRow, row) => {
+            const name = $($(row).find('.group').get(0)).text();
+            const hash = generateId(name);
+
+            const number = $($(row).find('.pnum').get(0)).text();
+            const numSubject = $($(row).find('.pnum').get(0)).text();
+            const numTeacher = $($(row).find('.pteacher').get(0)).text();
+            const denSubject = $($(row).find('.pnum').get(1)).text();
+            const denTeacher = $($(row).find('.pteacher').get(1)).text();
+
+            // We ensure execution even if there is an error on the College's website
+            if (!(hash in schedule)) {
+              schedule[hash] = {};
+            }
+
+            schedule[hash].replace.timestamp = timestamp;
+            schedule[hash].replace.lesson.push({
+              number,
+              numSubject,
+              numTeacher,
+              denSubject,
+              denTeacher,
+            });
+          });
+        }
       });
       const isDenominator = (() => {
         const html = Array.from(
@@ -466,19 +471,19 @@ class DataPkgh {
           out = Math.round((new Date().getTime() - new Date(new Date().getFullYear(),
             new Date().getMonth(), 0).getTime()) / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
           error.push('isDenominator is not correct');
-          console.warn('Schedule: isDenominator is not correct')
+          console.warn('Schedule: isDenominator is not correct');
         }
         return out;
       })();
 
       const payload = opts.single ? (() => {
-        const o = schedule;
-        o[this.single] = {
+        const out = schedule;
+        out['@single'] = {
           timestamp: Date.now(),
           isDenominator,
           error: [],
         };
-        return o;
+        return out;
       })() : schedule;
 
       this.completed = {
@@ -592,7 +597,7 @@ class DataPkgh {
       const call = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
       const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
       const payload = {
-        id: generateId(JSON.stringify({call, replaceCall})),
+        id: generateId(JSON.stringify({ call, replaceCall })),
         data: {
           call,
           replaceCall,
@@ -663,7 +668,7 @@ class DataPkgh {
             if (url.indexOf('http://') === -1) {
               url = `https://pkgh.edu.ru/${url}`;
             }
-            return false;
+            return undefined;
           }
         });
         return url;
@@ -692,7 +697,7 @@ class DataPkgh {
    */
   async toArray(d = null) {
     const data = d === null ? await this.now : d;
-    if (this.single in data) delete data[this.single];
+    if ('@single' in data) delete data['@single'];
     if (data instanceof Array) return data;
     return Object.keys(data).map((key) => data[key]);
   }
@@ -706,9 +711,9 @@ class DataPkgh {
    */
   async getSingle(callback, d = null) {
     let data = await (d === null ? this.now : d);
-    if (!(this.single in data)) {
+    if (!('@single' in data)) {
       console.warn('Single not found');
-      return await callback(data);
+      return callback(data);
     }
     const { single } = data;
     data = await callback(data);
@@ -728,7 +733,7 @@ class DataPkgh {
    */
   async firstIndex(index, d = null) {
     let data = await (d === null ? this.now : d);
-    if (this.single in data) delete data[this.single];
+    if ('@single' in data) delete data['@single'];
     const out = {};
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
     data.forEach((item) => {
@@ -746,7 +751,7 @@ class DataPkgh {
    */
   async groupIndex(index, d = null) {
     let data = d === null ? await this.now : d;
-    if (this.single in data) delete data[this.single];
+    if ('@single' in data) delete data['@single'];
     if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
 
     const out = {};
