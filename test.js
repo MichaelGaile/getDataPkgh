@@ -17,40 +17,30 @@ test('Schedule to Array', (t) => pkgh.getSchedule().then((r) => r.toArray()).the
 }));
 
 test('Types schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((r) => {
+  function check(val, type) {
+    if (typeof val !== type && val !== null) {
+      t.fail(`typeof ${typeof val} !== ${type}: \n ${val}`);
+    }
+    return true;
+  }
   r.forEach((item) => {
-    if (!(typeof item.name === 'string')) {
-      t.fail();
-    }
-    if (!(typeof item.specialty === 'string')) {
-      t.fail();
-    }
-    if (!(typeof item.replace.timestamp === 'number')) {
-      t.fail();
-    }
-    item.table.forEach((cell) => {
-      if (!(typeof cell.numSubject === 'number')) {
-        t.fail();
-      }
-      if (!(typeof cell.numTeacher === 'string')) {
-        t.fail();
-      }
-      if (!(typeof cell.denSubject === 'number')) {
-        t.fail();
-      }
-      if (!(typeof cell.denTeacher === 'string')) {
-        t.fail();
-      }
-      cell.replace.lesson.forEach((l) => {
-        if (!(typeof l.numSubject === 'number')) {
-          t.fail();
-        }
-        if (!(typeof l.numTeacher === 'string')) {
-          t.fail();
-        }
-        if (!(typeof l.denNumber === 'number')) {
-          t.fail();
-        }
+    check(item.name, 'string');
+    check(item.specialty, 'string');
+    check(item.replace.timestamp, 'number');
+    item.table.forEach((table) => {
+      check(table.dayWeek, 'string');
+      table.lesson.forEach((lesson) => {
+        check(lesson.numSubject, 'string');
+        check(lesson.numTeacher, 'string');
+        check(lesson.denSubject, 'string');
+        check(lesson.denTeacher, 'string');
       });
+    });
+    check(item.replace.timestamp, 'number');
+    item.replace.lesson.forEach((cell) => {
+      check(cell.numSubject, 'string');
+      check(cell.numTeacher, 'string');
+      check(cell.denNumber, 'string');
     });
   });
 

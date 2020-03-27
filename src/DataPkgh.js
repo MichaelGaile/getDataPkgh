@@ -355,147 +355,146 @@ class DataPkgh {
     const page = 'schedule';
 
     const cache = await this.checkCache(page);
-    if (!cache) {
-      const error = [];
-      // Not cache
-      const schedule = { };
-
-      this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
-        const $ = cheerio.load(html);
-        const mainTag = 'h4';
-
-        let specialty = '';
-
-        let tagReplace = null;
-
-        $(mainTag).each((numTag, tag) => {
-          if ($(tag).hasClass('dotted')) specialty = $(tag).text();
-          else if ($(tag).hasClass('expanded')) {
-            if ($(tag).text().toLowerCase().indexOf('замен') !== -1) tagReplace = tag;
-            else {
-              // Some schedule
-              const name = $(tag).text();
-              const hash = generateId($(tag).text());
-
-              schedule[hash] = {
-                id: hash,
-                table: [],
-                name,
-                specialty,
-                replace: {
-                  timestamp: null,
-                  lesson: [],
-                },
-              };
-
-              schedule[hash].name = name;
-
-              const parent = $(tag).parent();
-              const tables = $(parent).find('table');
-
-              tables.each((numTable, table) => {
-                const dayWeek = $($(table).find('.groupname').get(0)).text();
-                const tableCells = $(table).find('tr');
-
-                schedule[hash].table[numTable] = {
-                  dayWeek,
-                  lesson: [],
-                };
-
-                tableCells.each((cellNum, tableCell) => {
-                  const numSubject = $($(tableCell).find('.pname').get(0)).text();
-                  const numTeacher = $($(tableCell).find('.pteacher').get(0)).text();
-                  const denSubject = $($(tableCell).find('.paltname').get(0)).text();
-                  const denTeacher = $($(tableCell).find('.paltteacher').get(0)).text();
-
-                  schedule[hash].table[numTable].lesson[cellNum] = {
-                    numSubject,
-                    numTeacher,
-                    denSubject,
-                    denTeacher,
-                  };
-                });
-              });
-            }
-          }
-        });
-
-        // Completion replace
-        // Execution is always the last
-        if (tagReplace !== null) {
-          const timestamp = new Date(moment($(tagReplace).text().replace(/[^.0-9]/g, ''), 'dd.mm.yyyy').format());
-
-          const tbody = $($(tagReplace).parent()).find('tbody').get(0);
-          const rows = $(tbody).find('tr');
-
-          $(rows).each((numRow, row) => {
-            const name = $($(row).find('.group').get(0)).text();
-            const hash = generateId(name);
-
-            const number = $($(row).find('.pnum').get(0)).text();
-            const numSubject = $($(row).find('.pnum').get(0)).text();
-            const numTeacher = $($(row).find('.pteacher').get(0)).text();
-            const denSubject = $($(row).find('.pnum').get(1)).text();
-            const denTeacher = $($(row).find('.pteacher').get(1)).text();
-
-            // We ensure execution even if there is an error on the College's website
-            if (!(hash in schedule)) {
-              schedule[hash] = {};
-            }
-
-            schedule[hash].replace.timestamp = timestamp;
-            schedule[hash].replace.lesson.push({
-              number,
-              numSubject,
-              numTeacher,
-              denSubject,
-              denTeacher,
-            });
-          });
-        }
-      });
-      const isDenominator = (() => {
-        const html = Array.from(
-          Array.from(this.data[page].url.map((url) => this.html[url].payload))[0],
-        )[1];
-        const $ = cheerio.load(html);
-        let out = null;
-        $('script').each((i, script) => {
-          const htmlScript = $(script).html().split(' ').join('')
-            .toLowerCase();
-          if (htmlScript.indexOf('weeknum=') !== -1) {
-            out = Number(htmlScript.split('weeknum=')[1].split(';')[0]) % 2 === 0;
-          }
-        });
-        if (!out) {
-          out = Math.round((new Date().getTime() - new Date(new Date().getFullYear(),
-            new Date().getMonth(), 0).getTime()) / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
-          error.push('isDenominator is not correct');
-          console.warn('Schedule: isDenominator is not correct');
-        }
-        return out;
-      })();
-
-      const payload = opts.single ? (() => {
-        const out = schedule;
-        out['@single'] = {
-          timestamp: Date.now(),
-          isDenominator,
-          error: [],
-        };
-        return out;
-      })() : schedule;
-
-      this.completed = {
-        page,
-        payload,
-      };
-
-      this.now = payload;
-
+    if (cache) {
+      this.now = this.completed.schedule.data;
       return this;
     }
-    this.now = this.completed.schedule.data;
+
+    const error = [];
+    // Not cache
+    const schedule = { };
+
+    this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
+      const $ = cheerio.load(html);
+      const mainTag = 'h4';
+
+      let specialty = '';
+
+      let tagReplace = null;
+
+      $(mainTag).each((numTag, tag) => {
+        if ($(tag).hasClass('dotted')) specialty = $(tag).text();
+        else if ($(tag).hasClass('expanded')) {
+          if ($(tag).text().toLowerCase().indexOf('замен') !== -1) tagReplace = tag;
+          else {
+            // Some schedule
+            const name = $(tag).text();
+            const hash = generateId($(tag).text());
+
+            schedule[hash] = {
+              id: hash,
+              table: [],
+              name,
+              specialty,
+              replace: {
+                timestamp: null,
+                lesson: [],
+              },
+            };
+
+            schedule[hash].name = name;
+
+            const parent = $(tag).parent();
+            const tables = $(parent).find('table');
+
+            tables.each((numTable, table) => {
+              const dayWeek = $($(table).find('.groupname').get(0)).text();
+              const tableCells = $(table).find('tr');
+
+              schedule[hash].table[numTable] = {
+                dayWeek,
+                lesson: [],
+              };
+
+              tableCells.each((cellNum, tableCell) => {
+                const numSubject = $($(tableCell).find('.pname').get(0)).text();
+                const numTeacher = $($(tableCell).find('.pteacher').get(0)).text();
+                const denSubject = $($(tableCell).find('.paltname').get(0)).text();
+                const denTeacher = $($(tableCell).find('.paltteacher').get(0)).text();
+
+                schedule[hash].table[numTable].lesson[cellNum] = {
+                  numSubject,
+                  numTeacher,
+                  denSubject,
+                  denTeacher,
+                };
+              });
+            });
+          }
+        }
+      });
+
+      // Completion replace
+      // Execution is always the last
+      if (tagReplace !== null) {
+        const timestamp = new Date(moment($(tagReplace).text().replace(/[^.0-9]/g, ''), 'dd.mm.yyyy').format()).getTime();
+
+        const tbody = $($(tagReplace).parent()).find('tbody').get(0);
+        const rows = $(tbody).find('tr');
+
+        $(rows).each((numRow, row) => {
+          const name = $($(row).find('.group').get(0)).text();
+          const hash = generateId(name);
+
+          const number = Number($($(row).find('.pnum').get(0)).text());
+          const numSubject = $($(row).find('.pnum').get(0)).text();
+          const numTeacher = $($(row).find('.pteacher').get(0)).text();
+          const denSubject = $($(row).find('.pnum').get(1)).text();
+          const denTeacher = $($(row).find('.pteacher').get(1)).text();
+
+          // We ensure execution even if there is an error on the College's website
+          if (!(hash in schedule)) {
+            schedule[hash] = {};
+          }
+
+          schedule[hash].replace.timestamp = timestamp;
+          schedule[hash].replace.lesson.push({
+            number,
+            numSubject,
+            numTeacher,
+            denSubject,
+            denTeacher,
+          });
+        });
+      }
+    });
+    const isDenominator = opts.single ? (() => {
+      const html = Array.from(
+        Array.from(this.data[page].url.map((url) => this.html[url].payload))[0],
+      )[1];
+      const $ = cheerio.load(html);
+      let out = null;
+      $('script').each((i, script) => {
+        const htmlScript = $(script).html().split(' ').join('')
+          .toLowerCase();
+        if (htmlScript.indexOf('weeknum=') !== -1) {
+          out = Number(htmlScript.split('weeknum=')[1].split(';')[0]) % 2 === 0;
+        }
+      });
+      if (!out) {
+        out = Math.round((new Date().getTime() - new Date(new Date().getFullYear(),
+          new Date().getMonth(), 0).getTime()) / (1000 * 60 * 60 * 24 * 7)) % 2 === 0;
+        error.push('isDenominator is not correct');
+        console.warn('Schedule: isDenominator is not correct');
+      }
+      return out;
+    })() : null;
+
+    const payload = opts.single ? {
+      '@single': {
+        timestamp: Date.now(),
+        isDenominator,
+        error,
+      },
+      ...schedule,
+    } : schedule;
+
+    this.completed = {
+      page,
+      payload,
+    };
+
+    this.now = payload;
     return this;
   }
 
@@ -711,14 +710,14 @@ class DataPkgh {
    */
   async getSingle(callback, d = null) {
     let data = await (d === null ? this.now : d);
-    if (!('@single' in data)) {
+    if (typeof data === 'object' && !('@single' in data)) {
       console.warn('Single not found');
       return callback(data);
     }
-    const { single } = data;
+    const single = data['@single'];
     data = await callback(data);
     return {
-      single,
+      '@single': single,
       data,
     };
   }
