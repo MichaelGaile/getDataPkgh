@@ -1,32 +1,21 @@
 const cheerio = require('cheerio');
 const tableToJson = require('html-table-to-json');
-const fetch = require('node-fetch');
+const fetch = require('got');
 const excelToJson = require('convert-excel-to-json');
 const moment = require('moment');
-const { minify } = require('html-minifier');
 
 const Console = require('./Console.js');
 const generateId = require('./generateId.js');
 
 const console = new Console();
 
-// DataPkgh
-// cache -> on / off load data from the http://pkgh
-// To avoid loading servers you should enable the cache
-// timecache - html data retention period
-// load - allows you to load html,
-// the object accepts both pages and URLs as values
-// If your program is used without the Internet don't forget to disable the cache
-// example:
-//  load: { schedyle: 'HTML' }
-//  load: { 'URL': 'HTML' }
+const fetchCache = new Map();
+
 class DataPkgh {
   constructor(userOpts = {}) {
     // Set default opts
     const opts = (() => {
       const defaultOpts = {
-        cache: false,
-        timeCache: 900000,
         logLevel: 'error',
         load: {},
       };
@@ -35,109 +24,27 @@ class DataPkgh {
 
     console.rechangeLevel(opts.logLevel);
 
-    // Cache
-    // Needed for needed to reduce requests to the main server
-    // If there are errors your ip maybe blocked
-    // Use dynamic proxies for guaranteed data retrieval
-    this.cache = opts.cache;
-    // The time when data will be updated
-    // 15 minutes was chosen empirically as the optimal indicator
-    // of site variability and minimal load
-    // timeCache default 900000mls so 15min
-    this.timeCache = opts.timeCache;
-
     // Data
     // Main data where are they stored
     // Page {
     //  timestamp (Date.now(), time)
     //  url (Array, absolute url)
     // }
-    this._data = (() => {
-      // Set template data
-      // Fake url may have function
-      const data = {
-        schedule: {
-          timestamp: 0,
-          url: [
-            'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
-            'https://pkgh.edu.ru/zaochnoe-otdelenie.html',
-          ],
-        },
-        teacher: {
-          timestamp: 0,
-          url: [
-            'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]',
-          ],
-        },
-        chess: {
-          timestamp: 0,
-          url: [
-            'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
-          ],
-        },
-      };
-
-      // Parsing url's
-      // Replace all function url on Array from absolute url
-      const updateUrl = (d) => {
-        const out = d;
-        Object.keys(out).forEach((page) => {
-          const { url } = out[page];
-          out[page].url = [];
-          this.constructor.parseUrl(url).forEach((u) => {
-            out[page].url.push(u);
-          });
-        });
-        return out;
-      };
-      return updateUrl(data);
-    })();
-
-    // Save this final data
-    // Properties:
-    // Page (String) {
-    //  timestamp (Date.now, time)
-    //  data (Mixed data, some final data)
-    // }
-    this._completed = {
-      schedule: {
-        timestamp: 0,
-        data: null,
-      },
-      teacher: {
-        timestamp: 0,
-        data: null,
-      },
-    };
-
-    // Save raw html (String)
-    // Has properties:
-    // timestamp (Date.now(), some time),
-    // url (String, absolute url)
-    // payload (String, some HTML)
-    this._html = (() => {
-      const out = {};
-      const { data } = this;
-      Object.keys(data).forEach((page) => {
-        data[page].url.forEach((u) => {
-          out[u] = {
-            payload: null,
-            timestamp: 0,
-          };
-        });
-      });
-      return out;
-    })();
-
-    // this.lockNet = false;
-    //
-    // this.constructor.newLoad(opts.load);
-
+    const data = this.constructor.initData();
+    this.data = data;
     // Now!
     // For transmitting data via this
     // Only for using data formatting
     this.now = null;
 
+    const load = this.constructor.newLoad(opts.load, data);
+    this.load = load;
+
+    this.lockNet = Array.from(load).length !== 0;
+
+
+    // OOPS in js
+    // not work this in closure method
     // Single
     // Name of the property for the final data
     // Is used to obtain a single data point
@@ -147,70 +54,100 @@ class DataPkgh {
     moment.locale('ru');
   }
 
-  set completed(data) {
-    this._completed[data.page] = {
-      timestamp: Date.now(),
-      data: data.payload,
-    };
-  }
+  static initData() {
+    function parseUrl(url) {
+      function parse(str) {
+        if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
+        const func = str.split('[[')[1].split(']]')[0];
+        const title = func.split('(')[0];
 
-  get completed() {
-    return this._completed;
-  }
-
-  // input { page url payload }
-  set data(data) {
-    this._data[data.page].timestamp = Date.now();
-    this._data[data.page].payload.set(data.url, data.payload);
-  }
-
-  get data() {
-    return this._data;
-  }
-
-  set now(data) {
-    this._now = data;
-  }
-
-  get now() {
-    const data = this._now;
-    this._now = null;
-    return data;
-  }
-
-  get single() {
-    return this._single;
-  }
-
-  set html(data) {
-    this._html[data.url] = {
-      payload: data.payload,
-      timestamp: Date.now(),
-    };
-  }
-
-  get html() {
-    return this._html;
-  }
-
-  static newLoad(data) {
-    // Load load
-    // Install load in data html
-    if (Object.keys(data).length !== 0) {
-      Object.keys(data).forEach((index) => {
-        if (index.indexOf('http') === 0) {
-          this.html = { url: index, payload: data[index] };
-        } else {
-          this.html = {
-            url: this.data[index].url[0],
-            payload: data[index],
-          };
+        // Warning!!! Params default is string! be careful
+        let params = func.split('(')[1].split(')')[0].split(',');
+        if (title === 'range') {
+          params = params.map((p) => Number(p));
+          const plenty = [];
+          if (params.length <= 1) throw new Error('Not valid params in range function');
+          if (params[2] === undefined) params[2] = 1;
+          for (let i = params[0]; i <= params[1]; i += params[2]) {
+            plenty.push(str.replace(`[[${func}]]`, i));
+          }
+          return plenty;
         }
-        this.lockNet = true;
-      });
-    } else {
-      this.lockNet = false;
+        return str;
+      }
+
+      if (url instanceof Array) {
+        return [].concat(...url.map((u) => parse(u)));
+      }
+
+      return parse(url);
     }
+
+
+    // Set template data
+    // Fake url may have function
+    const data = {
+      schedule: {
+        timestamp: 0,
+        url: [
+          'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
+          'https://pkgh.edu.ru/zaochnoe-otdelenie.html',
+        ],
+      },
+      teacher: {
+        timestamp: 0,
+        url: [
+          'https://pkgh.edu.ru/obuchenie/teachers.html?start=[[range(0,99,11)]]',
+        ],
+      },
+      chess: {
+        timestamp: 0,
+        url: [
+          'https://pkgh.edu.ru/obuchenie/shedule-of-classes.html',
+        ],
+      },
+    };
+
+    // Parsing url's
+    // Replace all function url on Array from absolute url
+    const updateUrl = (d) => {
+      const out = d;
+      Object.keys(out).forEach((page) => {
+        const { url } = out[page];
+        out[page].url = [];
+        parseUrl(url).forEach((u) => {
+          out[page].url.push(u);
+        });
+      });
+      return out;
+    };
+    return updateUrl(data);
+  }
+
+  static newLoad(load, data) {
+    const out = new Map();
+    const keysData = Object.keys(load);
+    if (keysData.length !== 0) {
+      // Index may url or page name
+      keysData.forEach((index) => {
+        // Check url
+        if (index.indexOf('http') === 0) {
+          // index is url
+          out.set(index, load[index]);
+        } else if (load[index] instanceof Array) {
+          // index is page name
+          // load is Array
+          load[index].forEach((l, i) => {
+            out.set(data[index].url[i], l);
+          });
+        } else {
+          // index is page name
+          // load is string
+          out.set(data[index].url[0], load[index]);
+        }
+      });
+    }
+    return out;
   }
 
   /**
@@ -220,55 +157,20 @@ class DataPkgh {
    * @param {Array or String} url URL with or without a function
    * @returns {Array} Set of selected values
    */
-  static parseUrl(url) {
-    function parse(str) {
-      if (str.indexOf('[[') === -1 || str.indexOf(']]') === -1) return str;
-      const func = str.split('[[')[1].split(']]')[0];
-      const title = func.split('(')[0];
-
-      // Warning!!! Params default is string! be careful
-      let params = func.split('(')[1].split(')')[0].split(',');
-      if (title === 'range') {
-        params = params.map((p) => Number(p));
-        const plenty = [];
-        if (params.length <= 1) throw new Error('Not valid params in range function');
-        if (params[2] === undefined) params[2] = 1;
-        for (let i = params[0]; i <= params[1]; i += params[2]) {
-          plenty.push(str.replace(`[[${func}]]`, i));
-        }
-        return plenty;
-      }
-      return str;
-    }
-
-    if (url instanceof Array) {
-      return [].concat(...url.map((u) => parse(u)));
-    }
-
-    return parse(url);
-  }
-
-  /**
-   * Check html data storage time
-   *
-   * @param {String} page Page schedule, teacher... Multiple links linked to a page
-   * @param {Array or Number} l Limit where is the first value skip and the last restriction
-   * @returns {Boolean} Value allow cache
-   */
-  async checkCache(page, l = [0, 0]) {
+  async request(page, l = [0, 0]) {
     if (!(page in this.data)) throw new Error('page is not exists');
-    if (this.lockNet) return false;
+    if (this.lockNet) return this.data[page].url.filter((url) => this.load.get(url));
 
     const limit = (() => {
       const { length } = this.data[page].url;
       if (l instanceof Number) return [l, length];
       if (l.length === 1 || l[1] === 0) return [l[0], length];
       if (l[1] >= length) {
-        console.warn('Warning not correct limit value in checkCache');
+        console.warn('Warning not correct limit value in request');
         return [l[0], length];
       }
       if (l[0] < 0 || l[1] < 0) {
-        console.warn('Warning not correct limit value in checkCache');
+        console.warn('Warning not correct limit value in request');
         return [0, length];
       }
       return l;
@@ -276,40 +178,15 @@ class DataPkgh {
     // promise
     // Load html file (String)
     let promise = {};
-    let allowCache = true;
+    const loadUrl = [];
     for (let i = limit[0]; i < limit[1]; i++) {
       const url = this.data[page].url[i];
-      if (!this.cache
-        || (
-          this.html[url].timestamp === 0
-          || (Date.now() - this.html[url].timestamp) > this.timeCache)
-      ) {
-        promise[url] = { payload: fetch(url).then((r) => r.text()) };
-        allowCache = false;
-      }
+      loadUrl.push(url);
+      promise[url] = fetch(url, { cache: fetchCache }).then((r) => r.text());
     }
-    const loadUrl = Object.keys(promise);
-    promise = await Promise.all(loadUrl.map((url) => promise[url].payload)).then((data) => {
-      const out = {};
-      data.forEach((item, i) => {
-        out[loadUrl[i]] = {
-          payload: minify(item, {
-            removeAttributeQuotes: true,
-            removeComments: true,
-            collapseWhitespace: true,
-            collapseBooleanAttributes: true,
-            minifyCSS: true,
-            minifyJS: true,
-          }),
-          timestamp: Date.now(),
-        };
-      });
-      return out;
-    });
+    promise = await Promise.all(loadUrl.map((url) => promise[url].payload));
 
-    this._html = promise;
-
-    return allowCache;
+    return promise;
   }
 
   /* Struct data schedule
@@ -354,17 +231,12 @@ class DataPkgh {
     })();
     const page = 'schedule';
 
-    const cache = await this.checkCache(page);
-    if (cache) {
-      this.now = this.completed.schedule.data;
-      return this;
-    }
-
     const error = [];
-    // Not cache
+
     const schedule = { };
 
-    this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
+    const arrayHtml = await this.request(page);
+    arrayHtml.forEach((html) => {
       const $ = cheerio.load(html);
       const mainTag = 'h4';
 
@@ -489,11 +361,6 @@ class DataPkgh {
       ...schedule,
     } : schedule;
 
-    this.completed = {
-      page,
-      payload,
-    };
-
     this.now = payload;
     return this;
   }
@@ -520,61 +387,55 @@ class DataPkgh {
    */
   async getTeacher(limit = [0, 0]) {
     const page = 'teacher';
-    const cache = await this.checkCache(page, limit);
-    if (!cache) {
-      const teacher = {};
-      this.data[page].url.map((url) => this.html[url].payload).forEach((html) => {
-        const $ = cheerio.load(html);
-        const allBlock = $('.itemView');
-        allBlock.each((_, block) => {
-          const author = $($(block).find('[rel="author"]').get(0)).text();
-          const linkAuthor = $($(block).find('[rel="author"]').get(0)).attr('href');
-          // new Date(a('08 дек 2019 09:50', 'DD MMMM yyyy HH:mm').format())
-          const time = new Date(moment($($(block).find('time').get(0)).attr('datetime'), 'DD MMMM yyyy HH:mm').format());
-          const tag = $($(block).find('.tag-body').get(0)).text();
-          const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
-          const text = $($(block).find('.itemIntroText').get(0)).text();
+    const arrayHtml = await this.request(page, limit);
+    const teacher = {};
+    arrayHtml.forEach((html) => {
+      const $ = cheerio.load(html);
+      const allBlock = $('.itemView');
+      allBlock.each((_, block) => {
+        const author = $($(block).find('[rel="author"]').get(0)).text();
+        const linkAuthor = $($(block).find('[rel="author"]').get(0)).attr('href');
 
-          const download = () => {
-            const allLink = $($(block).find('.itemAttachments')).find('a');
-            const out = [];
-            allLink.each((i, link) => {
-              const href = $(link).attr('href');
-              const downloadText = $(link).text();
-              out.push({
-                link: href,
-                text: downloadText,
-              });
+        // new Date(a('08 дек 2019 09:50', 'DD MMMM yyyy HH:mm').format())
+        const time = new Date(moment($($(block).find('time').get(0)).attr('datetime'), 'DD MMMM yyyy HH:mm').format());
+
+        const tag = $($(block).find('.tag-body').get(0)).text();
+        const linkTag = $($(block).find('.tag-body').get(0)).attr('href');
+        const text = $($(block).find('.itemIntroText').get(0)).text();
+
+        const download = () => {
+          const allLink = $($(block).find('.itemAttachments')).find('a');
+          const out = [];
+          allLink.each((i, link) => {
+            const href = $(link).attr('href');
+            const downloadText = $(link).text();
+            out.push({
+              link: href,
+              text: downloadText,
             });
-            return out;
-          };
-          const hash = generateId(`${time}-${author}-${linkAuthor}-`);
+          });
+          return out;
+        };
+        const hash = generateId(`${time}-${author}-${linkAuthor}-`);
 
-          teacher[hash] = {
-            id: hash,
-            text,
-            author: {
-              text: author,
-              link: linkAuthor,
-            },
-            time,
-            tag: {
-              text: tag,
-              link: linkTag,
-            },
-            downoload: download(),
-          };
-        });
+        teacher[hash] = {
+          id: hash,
+          text,
+          author: {
+            text: author,
+            link: linkAuthor,
+          },
+          time,
+          tag: {
+            text: tag,
+            link: linkTag,
+          },
+          downoload: download(),
+        };
       });
-      this.completed = {
-        page,
-        payload: teacher,
-      };
-      this.now = teacher;
-      return this;
-    }
+    });
+    this.now = teacher;
 
-    this.now = this.completed[page].data;
     return this;
   }
 
@@ -587,28 +448,20 @@ class DataPkgh {
    */
   async getCall() {
     const page = 'schedule';
-    const cache = await this.checkCache(page);
-    if (!cache) {
-      const html = this.data[page].url.map((url) => this.html[url].payload).values().next().value;
+    const arrayHtml = await this.request(page)[0];
+
+    const call = new Map();
+
+    arrayHtml.forEach((html, i) => {
       const $ = cheerio.load(html);
       // Fix please
       // Cheerio cut parent tag
-      const call = tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results;
-      const replaceCall = tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results;
-      const payload = {
-        id: generateId(JSON.stringify({ call, replaceCall })),
-        data: {
-          call,
-          replaceCall,
-        },
-      };
-      this.completed = {
-        page: 'call',
-        payload,
-      };
-      return payload;
-    }
-    return this.completed.call;
+      call.set(i, {
+        main: tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results,
+        replace: tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results,
+      });
+    });
+    return call;
   }
 
   // No sort
@@ -620,30 +473,19 @@ class DataPkgh {
    */
   async getWarning() {
     const page = 'schedule';
-    const cache = await this.checkCache(page);
-    if (!cache) {
-      const html = this.data[page].url.map((url) => this.html[url].payload).values().next().value;
+    const arrayHtml = await this.request(page);
+    const warning = new Map();
+    arrayHtml.forEach((html, i) => {
       const $ = cheerio.load(html);
-      const warning = (() => {
+      warning.set(i, (() => {
         const w = $('.custom_max-attention').get(0);
-        $(w).find('table').each((i, el) => {
+        $(w).find('table').each((_, el) => {
           $(el).remove();
         });
         return $(w).text();
-      })();
-      const payload = {
-        id: generateId(warning),
-        timestamp: Date.now(),
-        data: warning,
-      };
-      this.completed = {
-        page: 'warning',
-        payload,
-      };
-      return payload;
-    }
-    this.now = this.completed.warning.data;
-    return this;
+      })());
+    });
+    return warning;
   }
 
   // No sort
@@ -654,39 +496,26 @@ class DataPkgh {
    * @returns {Object} XLSX to Json
    */
   async getChess() {
-    const page = 'chess';
-    const cache = await this.checkCache('schedule');
-    if (!cache) {
-      const html = this.data[page].url.map((url) => this.html[url].payload)[0];
-      const $ = cheerio.load(html);
-      const href = (() => {
-        let url = null;
-        $('aside').find('a').each((i, item) => {
-          if ($(item).text().toLowerCase().indexOf('шахматка') !== -1) {
-            url = $(item).attr('href');
-            if (url.indexOf('http://') === -1) {
-              url = `https://pkgh.edu.ru/${url}`;
-            }
-            return undefined;
+    const html = await this.request('schedule')[0];
+    const $ = cheerio.load(html);
+    const href = (() => {
+      let url = null;
+      $('aside').find('a').each((i, item) => {
+        if ($(item).text().toLowerCase().indexOf('шахматка') !== -1) {
+          url = $(item).attr('href');
+          if (url.indexOf('http://') === -1) {
+            url = `https://pkgh.edu.ru/${url}`;
           }
-        });
-        return url;
-      })();
-
-      const xl = excelToJson({
-        source: await fetch(href).then((r) => r.buffer()),
+          return undefined;
+        }
       });
-      const payload = {
-        id: generateId(JSON.stringify(xl)),
-        data: xl,
-      };
-      this.completed = {
-        page,
-        payload,
-      };
-      return payload;
-    }
-    return this.completed.chess.data;
+      return url;
+    })();
+
+    const xl = excelToJson({
+      source: await fetch(href, { cache: fetchCache }).then((r) => r.buffer()),
+    });
+    return xl;
   }
 
   /**
