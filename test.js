@@ -13,7 +13,7 @@ const pkgh = new DataPkgh({
 });
 
 test('Schedule to Array', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((r) => {
-  t.is(true, (r instanceof Array && r.length !== 0));
+  t.is(true, (Array.isArray(r) && r.length !== 0));
 }));
 
 test('Types schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((r) => {
@@ -53,15 +53,15 @@ test('Schedule firstIndex', (t) => pkgh.getSchedule().then((r) => r.firstIndex('
 }));
 
 test('Schedule groupIndex', (t) => pkgh.getSchedule().then((r) => r.groupIndex('spesialty')).then((r) => {
-  t.is(true, r[Object.keys(r)[0]] instanceof Array);
+  t.is(true, Array.isArray(r[Object.keys(r)[0]]));
 }));
 
 test('Schedule getSingle', (t) => pkgh.getSchedule().then((r) => r.getSingle(r.toArray)).then((r) => {
-  t.is(true, r instanceof Object && r.data instanceof Array && !!r.single);
+  t.is(true, typeof r === 'object' && r !== null && Array.isArray(r.data) && !!r.single);
 }));
 
 test('Teacher', (t) => pkgh.getTeacher().then((r) => r.toArray()).then((r) => {
-  t.is(true, (r instanceof Array && r.length !== 0));
+  t.is(true, (Array.isArray(r) && r.length !== 0));
 }));
 
 test('Chess', (t) => pkgh.getChess().then((r) => {
