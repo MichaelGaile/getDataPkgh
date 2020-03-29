@@ -21,6 +21,7 @@
     "cheerio": "^1.0.0-rc.3",
     "convert-excel-to-json": "^1.6.1",
     "cyrillic-to-translit-js": "^3.0.1",
+    "got": "^10.7.0",
     "html-minifier": "^4.0.0",
     "html-table-to-json": "^1.0.0",
     "htmlparser2": "^4.0.0",
