@@ -76,7 +76,7 @@ class DataPkgh {
         return str;
       }
 
-      if (url instanceof Array) {
+      if (Array.isArray(url)) {
         return [].concat(...url.map((u) => parse(u)));
       }
 
@@ -134,7 +134,7 @@ class DataPkgh {
         if (index.indexOf('http') === 0) {
           // index is url
           out.set(index, load[index]);
-        } else if (load[index] instanceof Array) {
+        } else if (Array.isArray(load[index])) {
           // index is page name
           // load is Array
           load[index].forEach((l, i) => {
@@ -159,11 +159,19 @@ class DataPkgh {
    */
   async request(page, l = [0, 0]) {
     if (!(page in this.data)) throw new Error('page is not exists');
-    if (this.lockNet) return this.data[page].url.filter((url) => this.load.get(url));
+    if (this.lockNet) {
+      return (() => {
+        const out = [];
+        this.data[page].url.forEach((url) => {
+          if (this.load.get(url)) out.push(this.load.get(url));
+        });
+        return out;
+      })();
+    }
 
     const limit = (() => {
       const { length } = this.data[page].url;
-      if (l instanceof Number) return [l, length];
+      if (typeof l === 'number') return [l, length];
       if (l.length === 1 || l[1] === 0) return [l[0], length];
       if (l[1] >= length) {
         console.warn('Warning not correct limit value in request');
@@ -313,7 +321,7 @@ class DataPkgh {
 
           // We ensure execution even if there is an error on the College's website
           if (!(hash in schedule)) {
-            schedule[hash] = {};
+            return false;
           }
 
           schedule[hash].replace.timestamp = timestamp;
@@ -324,6 +332,7 @@ class DataPkgh {
             denSubject,
             denTeacher,
           });
+          return true;
         });
       }
     });
@@ -521,7 +530,7 @@ class DataPkgh {
   async toArray(d = null) {
     const data = d === null ? await this.now : d;
     if ('@single' in data) delete data['@single'];
-    if (data instanceof Array) return data;
+    if (Array.isArray(data)) return data;
     return Object.keys(data).map((key) => data[key]);
   }
 
@@ -558,7 +567,7 @@ class DataPkgh {
     let data = await (d === null ? this.now : d);
     if ('@single' in data) delete data['@single'];
     const out = {};
-    if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
+    if (!(Array.isArray(data))) data = Object.keys(data).map((key) => data[key]);
     data.forEach((item) => {
       out[item[index]] = item;
     });
@@ -575,7 +584,7 @@ class DataPkgh {
   async groupIndex(index, d = null) {
     let data = d === null ? await this.now : d;
     if ('@single' in data) delete data['@single'];
-    if (!(data instanceof Array)) data = Object.keys(data).map((key) => data[key]);
+    if (!Array.isArray(data)) data = Object.keys(data).map((key) => data[key]);
 
     const out = {};
     data.map((item) => item[index])

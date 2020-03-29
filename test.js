@@ -4,7 +4,6 @@ const fs = require('fs');
 const DataPkgh = require('./src/index.js');
 
 const pkgh = new DataPkgh({
-  cache: true,
   logLevel: 'debug',
   load: {
     schedule: fs.readFileSync('./test/schedule.html', 'utf-8'),
