@@ -16,7 +16,7 @@ class DataPkgh {
     // Set default opts
     const opts = (() => {
       const defaultOpts = {
-        logLevel: 'error',
+        logLevel: 'warn',
         load: {},
       };
       return Object.assign(defaultOpts, userOpts);
@@ -177,16 +177,13 @@ class DataPkgh {
     })();
     // promise
     // Load html file (String)
-    let promise = {};
-    const loadUrl = [];
+    let multiStore = [];
     for (let i = limit[0]; i < limit[1]; i++) {
-      const url = this.data[page].url[i];
-      loadUrl.push(url);
-      promise[url] = fetch(url, { cache: fetchCache }).then((r) => r.text());
+      multiStore.push(fetch(this.data[page].url[i], { cache: fetchCache }).text());
     }
-    promise = await Promise.all(loadUrl.map((url) => promise[url].payload));
+    multiStore = await Promise.all(multiStore);
 
-    return promise;
+    return multiStore;
   }
 
   /* Struct data schedule
@@ -331,9 +328,7 @@ class DataPkgh {
       }
     });
     const isDenominator = opts.single ? (() => {
-      const html = Array.from(
-        Array.from(this.data[page].url.map((url) => this.html[url].payload))[0],
-      )[1];
+      const html = arrayHtml[0];
       const $ = cheerio.load(html);
       let out = null;
       $('script').each((i, script) => {
@@ -448,7 +443,7 @@ class DataPkgh {
    */
   async getCall() {
     const page = 'schedule';
-    const arrayHtml = await this.request(page)[0];
+    const arrayHtml = await this.request(page);
 
     const call = new Map();
 
@@ -513,7 +508,7 @@ class DataPkgh {
     })();
 
     const xl = excelToJson({
-      source: await fetch(href, { cache: fetchCache }).then((r) => r.buffer()),
+      source: await fetch(href, { cache: fetchCache }).buffer(),
     });
     return xl;
   }
