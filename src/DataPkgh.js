@@ -5,14 +5,18 @@ const excelToJson = require('convert-excel-to-json');
 const moment = require('moment');
 
 const Console = require('./Console.js');
+const Format = require('./Format.js');
 const generateId = require('./generateId.js');
 
 const console = new Console();
 
 const fetchCache = new Map();
 
-class DataPkgh {
+moment.locale('ru');
+
+class DataPkgh extends Format {
   constructor(userOpts = {}) {
+    super();
     // Set default opts
     const opts = (() => {
       const defaultOpts = {
@@ -50,8 +54,6 @@ class DataPkgh {
     // Is used to obtain a single data point
     // To get this data, use the method <<getSingle>>
     // this._single = opts.single;
-
-    moment.locale('ru');
   }
 
   static initData() {
@@ -82,7 +84,6 @@ class DataPkgh {
 
       return parse(url);
     }
-
 
     // Set template data
     // Fake url may have function
@@ -520,82 +521,6 @@ class DataPkgh {
       source: await fetch(href, { cache: fetchCache }).buffer(),
     });
     return xl;
-  }
-
-  /**
-   * Returns the prepared data as an array
-   *
-   * @param {Object or Array} d Parameter data to bypass 'now' only for use inside other functions
-   */
-  async toArray(d = null) {
-    const data = d === null ? await this.now : d;
-    if ('@single' in data) delete data['@single'];
-    if (Array.isArray(data)) return data;
-    return Object.keys(data).map((key) => data[key]);
-  }
-
-  /**
-   * Returns object with the key 'single'. Where individual data is stored
-   *
-   * @param {Function} callback Used to represent data inside an object
-   * @param {Object or Array} d=null Used only for internal functions
-   * @returns {Object or Array} Returns data in a convenient format along with individual data
-   */
-  async getSingle(callback, d = null) {
-    let data = await (d === null ? this.now : d);
-    if (typeof data === 'object' && !('@single' in data)) {
-      console.warn('Single not found');
-      return callback(data);
-    }
-    const single = data['@single'];
-    data = await callback(data);
-    return {
-      '@single': single,
-      data,
-    };
-  }
-
-  /**
-   * Formatting data
-   *
-   * @param {String} index The data sample with the same index. Attention!
-   * Indexes must be unique otherwise use groupIndex
-   * @param {Object or Array} d=null Data with the now crawl. Use inside other functions
-   * @returns {Object} Object set with the selected index
-   */
-  async firstIndex(index, d = null) {
-    let data = await (d === null ? this.now : d);
-    if ('@single' in data) delete data['@single'];
-    const out = {};
-    if (!(Array.isArray(data))) data = Object.keys(data).map((key) => data[key]);
-    data.forEach((item) => {
-      out[item[index]] = item;
-    });
-    return out;
-  }
-
-  /**
-   * Formatting data
-   *
-   * @param {String} index Index storage in array or object
-   * @param {Object or Array} d=null Data with the 'now' crawl. Use inside other function
-   * @returns {Object} Grouped data with an index selection
-   */
-  async groupIndex(index, d = null) {
-    let data = d === null ? await this.now : d;
-    if ('@single' in data) delete data['@single'];
-    if (!Array.isArray(data)) data = Object.keys(data).map((key) => data[key]);
-
-    const out = {};
-    data.map((item) => item[index])
-      .filter((item, i, self) => self.indexOf(item) === i)
-      .forEach((spec) => {
-        out[spec] = [];
-        data.forEach((item) => {
-          out[spec].push(item);
-        });
-      });
-    return out;
   }
 }
 
