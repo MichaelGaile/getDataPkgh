@@ -39,7 +39,8 @@ test('Types schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((
     item.replace.lesson.forEach((cell) => {
       check(cell.numSubject, 'string');
       check(cell.numTeacher, 'string');
-      check(cell.denNumber, 'string');
+      check(cell.denSubject, 'string');
+      check(cell.denTeacher, 'string');
     });
   });
 
@@ -56,7 +57,7 @@ test('Schedule groupIndex', (t) => pkgh.getSchedule().then((r) => r.groupIndex('
 }));
 
 test('Schedule getSingle', (t) => pkgh.getSchedule().then((r) => r.getSingle(r.toArray)).then((r) => {
-  t.is(true, typeof r === 'object' && r !== null && Array.isArray(r.data) && !!r.single);
+  t.true(typeof r['@single'] === 'object' && r['@single'] !== null && Object.keys(r).length === 2 && Array.isArray(r.data));
 }));
 
 test('Teacher', (t) => pkgh.getTeacher().then((r) => r.toArray()).then((r) => {

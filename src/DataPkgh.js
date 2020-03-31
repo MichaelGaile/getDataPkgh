@@ -497,7 +497,7 @@ class DataPkgh {
    * @returns {Object} XLSX to Json
    */
   async getChess() {
-    const html = await this.request('schedule')[0];
+    const html = (await this.request('schedule'))[0];
     const $ = cheerio.load(html);
     const href = (() => {
       let url = null;
@@ -507,8 +507,9 @@ class DataPkgh {
           if (url.indexOf('http://') === -1) {
             url = `https://pkgh.edu.ru/${url}`;
           }
-          return undefined;
+          return false;
         }
+        return true;
       });
       return url;
     })();
