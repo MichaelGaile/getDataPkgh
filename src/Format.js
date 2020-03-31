@@ -1,29 +1,17 @@
-
 class Format {
-  constructor() {
-    this.single = '@single';
-    this._now = null;
-  }
-
-  set now(data) {
-    this._now = data;
-  }
-
-  get now() {
-    const out = this._now;
-    this._now = null;
-    return out;
+  constructor(data) {
+    this.data = data;
   }
 
   toArray(d = null) {
-    const data = d === null ? this.now : d;
+    const data = d === null ? this.data : d;
     if ('@single' in data) delete data['@single'];
     if (Array.isArray(data)) return data;
     return Object.keys(data).map((key) => data[key]);
   }
 
   getSingle(callback, d = null) {
-    let data = d === null ? this.now : d;
+    let data = d === null ? this.data : d;
     if (typeof data === 'object' && !('@single' in data)) {
       return callback(data);
     }
@@ -36,7 +24,7 @@ class Format {
   }
 
   firstIndex(index, d = null) {
-    let data = d === null ? this.now : d;
+    let data = d === null ? this.data : d;
     if ('@single' in data) delete data['@single'];
     const out = {};
     if (!(Array.isArray(data))) data = Object.keys(data).map((key) => data[key]);
@@ -47,7 +35,7 @@ class Format {
   }
 
   groupIndex(index, d = null) {
-    let data = d === null ? this.now : d;
+    let data = d === null ? this.data : d;
     if ('@single' in data) delete data['@single'];
     if (!Array.isArray(data)) data = Object.keys(data).map((key) => data[key]);
 

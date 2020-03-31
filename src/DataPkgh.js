@@ -14,9 +14,8 @@ const fetchCache = new Map();
 
 moment.locale('ru');
 
-class DataPkgh extends Format {
+class DataPkgh {
   constructor(userOpts = {}) {
-    super();
     // Set default opts
     const opts = (() => {
       const defaultOpts = {
@@ -366,8 +365,7 @@ class DataPkgh extends Format {
       ...schedule,
     } : schedule;
 
-    this.now = payload;
-    return this;
+    return new Format(payload);
   }
 
   // Struct data Teacher
@@ -439,9 +437,7 @@ class DataPkgh extends Format {
         };
       });
     });
-    this.now = teacher;
-
-    return this;
+    return new Format(teacher);
   }
 
   // No sort
