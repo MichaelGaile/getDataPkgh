@@ -451,13 +451,13 @@ class DataPkgh {
     const page = 'schedule';
     const arrayHtml = await this.request(page);
 
-    const call = new Map();
+    const call = [];
 
-    arrayHtml.forEach((html, i) => {
+    arrayHtml.forEach((html) => {
       const $ = cheerio.load(html);
       // Fix please
       // Cheerio cut parent tag
-      call.set(i, {
+      call.push({
         main: tableToJson.parse(`<table>${$($('.custom .simple-little-table').get(0)).html()}</table>`).results,
         replace: tableToJson.parse(`<table>${$($('.custom_max-attention .simple-little-table').get(0)).html()}</table>`).results,
       });
@@ -475,10 +475,10 @@ class DataPkgh {
   async getWarning() {
     const page = 'schedule';
     const arrayHtml = await this.request(page);
-    const warning = new Map();
-    arrayHtml.forEach((html, i) => {
+    const warning = [];
+    arrayHtml.forEach((html) => {
       const $ = cheerio.load(html);
-      warning.set(i, (() => {
+      warning.push((() => {
         const w = $('.custom_max-attention').get(0);
         $(w).find('table').each((_, el) => {
           $(el).remove();
