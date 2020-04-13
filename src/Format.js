@@ -42,10 +42,13 @@ class Format {
     const out = {};
     data.map((item) => item[index])
       .filter((item, i, self) => self.indexOf(item) === i)
-      .forEach((spec) => {
-        out[spec] = [];
+      .forEach((ind) => {
+        // ind is one index
+        out[ind] = [];
         data.forEach((item) => {
-          out[spec].push(item);
+          if(item[index] === ind) {
+            out[ind].push(item);
+          }
         });
       });
     return out;
