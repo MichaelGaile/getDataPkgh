@@ -29,6 +29,7 @@ test('Types schedule', (t) => pkgh.getSchedule().then((r) => r.toArray()).then((
     item.table.forEach((table) => {
       check(table.dayWeek, 'string');
       table.lesson.forEach((lesson) => {
+        check(lesson.number, 'number');
         check(lesson.numSubject, 'string');
         check(lesson.numTeacher, 'string');
         check(lesson.denSubject, 'string');
