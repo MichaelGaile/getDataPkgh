@@ -1,7 +1,7 @@
 # get-data-pkgh 
 Получение данных с сайта колледжа
 Скрапинг + парсинг на nodejs
-## Контент
+
 + [Быстрый старт](#Быстрый-старт)
 + [Инициализация](#Инициализация)
 + [Генерация индификатора](#Генерация-индификатора)
@@ -19,40 +19,51 @@
 npm install get-data-pkgh
 ```
 ``` node
-    const dPkgh = require('get-data-pkgh');
-    const pkgh = new dPkgh();
-    pkgh.getSchedule().then((r) => console.log(r));
+    const DataPkgh = require('get-data-pkgh');
+    const pkgh = new DataPkgh();
+    pkgh.getSchedule().then((r) => r.toArray()).then(console.log)
+  // Вывод расписание
 ```
 ---
 ## Инициализация
-cache bool(true) - Кеш загрузки и обработки
-timeCache(150000)ms - Время жизни кеша
+Аргументы:
+  logLevel - уровень логгирования данных (log, warn, error, debug)
+  load - загрузка данных из другого источника. Ключ может быть как шаблоном(schedule, teacher) так и absolute url.
+  При установки аргумента load подключения к интернету не будет! 
 ``` node
-    const dPkgh = require('get-data-pkgh');
-    const cache = true;
-    const timeCache = 30000;
-    const pkgh = new dPkgh(cache, timeCache);
+  const DataPkgh = require('get-data-pkgh');
+  const load = {
+    'schedule': fs.readFileSync('./schedule.html'),
+    'https://pkgh.edu.ru/obuchenie/teachers.html?start=00': fs.readFileSync('./first-teacher.html'),
+  };
+  const logLevel = 'debug';
+  const pkgh = DataPkgh({load, logLevel});
 ```
 ---
 ## Генерация индификатора
-Позволяет получить индификатор на основе строки убирая спец символы и спам символы
+Позволяет получить хеш сумму на основе строки убирая спец символы.
+Аргументы:
+  str - База
+  hash - boolean value. Включение md5 хеширование конечной строки.
 ``` node
   const generateId = require('get-data-pkgh').generateId;
-  console.log(generateId('МР-18-6'));
+  console.log(generateId('МР-18-6', false));
   // => 'MR186'
 ```
 ---
 ## Расписание
-### Получить весь список
+### Получить весь список в виде массива
 ``` node
-    pkgh.getSchedule().then((r) => console.log(r));
+    pkgh.getSchedule().then((r) => r.toArray()).then((r) => console.log(r));
 ```
 ### Структура данных расписания
 ``` node
 {
   ID: Индификатор группы {
-    table: таблицы одной группы [
-      dayWeek: День недели,
+    name: Имя группы
+    specialty: Специальность группы
+    table: Массив дней расписания [
+      dayWeek: День недели
       lesson: [
         {
           numSubject: Предмет по числителю,
@@ -64,8 +75,6 @@ timeCache(150000)ms - Время жизни кеша
       ]
       ...
     ]
-    name: Имя группы,
-    specialty: Специальность группы,
   }
   EE1934kz: {
     table: [ [Object]  ],
@@ -83,9 +92,8 @@ timeCache(150000)ms - Время жизни кеша
 ### Получить конкретную группу
 ** При получении конкретной группы будет загружена и обработана вся страница колледжа **
 ``` node
-    const generateId = dPkgh.generateId;
-    const id = generateId('КП-18-25');
-    pkgh.getScheduleGroup(id).then((r) => console.log(r));
+  const generateId = require('get-data-pkgh').generateId;
+  pkgh.getSchedule((r) => r.firstIndex('id')).then((r) => { console.log(r[generateId('МР-18-6')]) })
 ```
 
 ---

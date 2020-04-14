@@ -284,7 +284,7 @@ class DataPkgh {
               };
 
               tableCells.each((cellNum, tableCell) => {
-                const number = Number($($(cellNum).find('.pnum').get(0)).text());
+                const number = Number($($(tableCell).find('.pnum').get(0)).text());
                 const numSubject = $($(tableCell).find('.pname').get(0)).text();
                 const numTeacher = $($(tableCell).find('.pteacher').get(0)).text();
                 const denSubject = $($(tableCell).find('.paltname').get(0)).text();
